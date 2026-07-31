@@ -177,11 +177,13 @@ export class SolicitudesService {
 				await this.productosRepository.save(
 					this.productosRepository.create({
 						nombre: String(payload.nombre ?? ''),
-						precio: Number(payload.precio ?? 0),
 						descripcion: String(payload.descripcion ?? ''),
 						categoria: String(payload.categoria ?? ''),
 						subcategoria: payload.subcategoria ? String(payload.subcategoria) : null,
 						imagenUrl: payload.imagenUrl ? String(payload.imagenUrl) : null,
+						imagenUrl2: payload.imagenUrl2 ? String(payload.imagenUrl2) : null,
+						imagenUrl3: payload.imagenUrl3 ? String(payload.imagenUrl3) : null,
+						imagenUrl4: payload.imagenUrl4 ? String(payload.imagenUrl4) : null,
 						vendedorId: vendedor.id,
 					}),
 				);
@@ -198,9 +200,6 @@ export class SolicitudesService {
 				if (payload.nombre !== undefined) {
 					producto.nombre = String(payload.nombre);
 				}
-				if (payload.precio !== undefined) {
-					producto.precio = Number(payload.precio);
-				}
 				if (payload.descripcion !== undefined) {
 					producto.descripcion = String(payload.descripcion);
 				}
@@ -212,6 +211,15 @@ export class SolicitudesService {
 				}
 				if (payload.imagenUrl !== undefined) {
 					producto.imagenUrl = payload.imagenUrl ? String(payload.imagenUrl) : null;
+				}
+				if (payload.imagenUrl2 !== undefined) {
+					producto.imagenUrl2 = payload.imagenUrl2 ? String(payload.imagenUrl2) : null;
+				}
+				if (payload.imagenUrl3 !== undefined) {
+					producto.imagenUrl3 = payload.imagenUrl3 ? String(payload.imagenUrl3) : null;
+				}
+				if (payload.imagenUrl4 !== undefined) {
+					producto.imagenUrl4 = payload.imagenUrl4 ? String(payload.imagenUrl4) : null;
 				}
 
 				await this.productosRepository.save(producto);

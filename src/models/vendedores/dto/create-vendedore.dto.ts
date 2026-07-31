@@ -9,4 +9,5 @@ export class CreateVendedoreDto {
 	ubicacion?: string;
 	whatsapp?: string;
 	telefono?: string;
+	logoUrl?: string;
 }

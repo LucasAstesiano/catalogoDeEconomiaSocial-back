@@ -3,6 +3,8 @@ import { VendedoresService } from './vendedores.service';
 import { CreateVendedoreDto } from './dto/create-vendedore.dto';
 import { UpdateVendedoreDto } from './dto/update-vendedore.dto';
 import { LoginVendedoreDto } from './dto/login-vendedore.dto';
+import { ChangePasswordVendedoreDto } from './dto/change-password-vendedore.dto';
+import { UpdateLogoVendedoreDto } from './dto/update-logo-vendedore.dto';
 
 @Controller('vendedores')
 export class VendedoresController {
@@ -31,6 +33,28 @@ export class VendedoresController {
   @Patch(':id')
   update(@Param('id') id: string, @Body() updateVendedoreDto: UpdateVendedoreDto) {
     return this.vendedoresService.update(+id, updateVendedoreDto);
+  }
+
+  @Patch(':id/logo')
+  updateLogo(@Param('id') id: string, @Body() updateLogoDto: UpdateLogoVendedoreDto) {
+    return this.vendedoresService.updateLogo(+id, updateLogoDto.logoUrl ?? null);
+  }
+
+  @Patch('passwords/reset-default')
+  resetAllPasswordsToDefault() {
+    return this.vendedoresService.resetAllPasswordsToDefault();
+  }
+
+  @Patch(':id/password')
+  changePassword(
+    @Param('id') id: string,
+    @Body() changePasswordDto: ChangePasswordVendedoreDto,
+  ) {
+    return this.vendedoresService.changePassword(
+      +id,
+      String(changePasswordDto.currentPassword ?? ''),
+      String(changePasswordDto.newPassword ?? ''),
+    );
   }
 
   @Patch(':id/administrador')

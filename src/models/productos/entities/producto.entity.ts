@@ -15,9 +15,6 @@ export class Producto {
 	@Column({ type: 'varchar', length: 120 })
 	nombre: string;
 
-	@Column({ type: 'decimal', precision: 10, scale: 2 })
-	precio: number;
-
 	@Column({ type: 'text' })
 	descripcion: string;
 
@@ -30,8 +27,20 @@ export class Producto {
 	@Column({ name: 'imagen_url', type: 'text', nullable: true })
 	imagenUrl: string | null;
 
+	@Column({ name: 'imagen_url_2', type: 'text', nullable: true })
+	imagenUrl2: string | null;
+
+	@Column({ name: 'imagen_url_3', type: 'text', nullable: true })
+	imagenUrl3: string | null;
+
+	@Column({ name: 'imagen_url_4', type: 'text', nullable: true })
+	imagenUrl4: string | null;
+
 	@Column({ name: 'vendedor_id' })
 	vendedorId: number;
+
+	@Column({ type: 'boolean', default: false })
+	destacado: boolean;
 
 	@ManyToOne(() => Vendedor, (vendedor) => vendedor.productos, {
 		nullable: false,
@@ -40,4 +49,3 @@ export class Producto {
 	@JoinColumn({ name: 'vendedor_id' })
 	vendedor: Vendedor;
 }
-

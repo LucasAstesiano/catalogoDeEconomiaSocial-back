@@ -6,6 +6,17 @@ import { UpdateProductoDto } from './dto/update-producto.dto';
 import { Producto } from './entities/producto.entity';
 import { Vendedor} from '../vendedores/entities/vendedore.entity';
 
+const normalizarBooleano = (valor: unknown): boolean => {
+  if (typeof valor === 'boolean') return valor;
+  if (typeof valor === 'number') return valor === 1;
+  if (typeof valor === 'string') {
+    const normalizado = valor.trim().toLowerCase();
+    if (['true', '1', 'si', 'sí', 'yes', 'on'].includes(normalizado)) return true;
+    if (['false', '0', 'no', 'off', ''].includes(normalizado)) return false;
+  }
+  return false;
+};
+
 @Injectable()
 export class ProductosService {
   constructor(
@@ -29,12 +40,15 @@ export class ProductosService {
 
     const producto = this.productosRepository.create({
       nombre: createProductoDto.nombre,
-      precio: createProductoDto.precio,
       descripcion: createProductoDto.descripcion,
       categoria: createProductoDto.categoria,
       subcategoria: createProductoDto.subcategoria ?? null,
       imagenUrl: createProductoDto.imagenUrl ?? null,
+      imagenUrl2: createProductoDto.imagenUrl2 ?? null,
+      imagenUrl3: createProductoDto.imagenUrl3 ?? null,
+      imagenUrl4: createProductoDto.imagenUrl4 ?? null,
       vendedorId: vendedor.id,
+	  destacado: normalizarBooleano(createProductoDto.destacado),
     });
 
     return this.productosRepository.save(producto);
@@ -80,14 +94,32 @@ export class ProductosService {
 
     Object.assign(producto, {
       nombre: updateProductoDto.nombre ?? producto.nombre,
-      precio: updateProductoDto.precio ?? producto.precio,
       descripcion: updateProductoDto.descripcion ?? producto.descripcion,
       categoria: updateProductoDto.categoria ?? producto.categoria,
       subcategoria:
         updateProductoDto.subcategoria !== undefined
           ? updateProductoDto.subcategoria
           : producto.subcategoria,
-      imagenUrl: updateProductoDto.imagenUrl ?? producto.imagenUrl,
+      imagenUrl:
+        updateProductoDto.imagenUrl !== undefined
+          ? updateProductoDto.imagenUrl
+          : producto.imagenUrl,
+      imagenUrl2:
+        updateProductoDto.imagenUrl2 !== undefined
+          ? updateProductoDto.imagenUrl2
+          : producto.imagenUrl2,
+      imagenUrl3:
+        updateProductoDto.imagenUrl3 !== undefined
+          ? updateProductoDto.imagenUrl3
+          : producto.imagenUrl3,
+      imagenUrl4:
+        updateProductoDto.imagenUrl4 !== undefined
+          ? updateProductoDto.imagenUrl4
+          : producto.imagenUrl4,
+	  destacado:
+		updateProductoDto.destacado !== undefined
+      ? normalizarBooleano(updateProductoDto.destacado)
+		  : producto.destacado,
     });
 
     return this.productosRepository.save(producto);

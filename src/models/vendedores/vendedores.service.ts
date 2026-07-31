@@ -14,6 +14,8 @@ import { Vendedor} from './entities/vendedore.entity';
 
 @Injectable()
 export class VendedoresService {
+  private readonly defaultPassword = '1234';
+
   constructor(
     @InjectRepository(Vendedor)
     private readonly vendedoresRepository: Repository<Vendedor>,
@@ -36,14 +38,38 @@ export class VendedoresService {
       ubicacion: vendedor.ubicacion,
       whatsapp: vendedor.whatsapp,
       telefono: vendedor.telefono,
+      logoUrl: vendedor.logoUrl,
     };
   }
 
   async ensureSeedUsers() {
-    await this.vendedoresRepository.update(
-      { email: 'lucasagustinastesiano@gmail.com' },
-      { rol: 'administrador', estadoSolicitud: 'aprobado' },
-    );
+    const lucasEmail = 'lucasagustinastesiano@gmail.com';
+
+    const lucas = await this.vendedoresRepository.findOne({
+      where: { email: lucasEmail },
+    });
+
+    if (lucas) {
+      lucas.rol = 'administrador';
+      lucas.estadoSolicitud = 'aprobado';
+      await this.vendedoresRepository.save(lucas);
+    } else {
+      await this.vendedoresRepository.save(
+        this.vendedoresRepository.create({
+          nombre: 'Lucas Astesiano',
+          email: lucasEmail,
+          rol: 'administrador',
+          estadoSolicitud: 'aprobado',
+          ruess: '9499',
+          descripcionNegocio: 'Emprendimiento local con foco en produccion textil y ventas minoristas.',
+          integrantesEquipo: ['Fabiana Astudillo', 'Horacio Rios'],
+          ubicacion: 'San Jose, Guaymallen',
+          whatsapp: '+549261245684',
+          telefono: '261245684',
+          passwordHash: this.hashPassword(this.defaultPassword),
+        }),
+      );
+    }
 
     const count = await this.vendedoresRepository.count();
     if (count > 0) {
@@ -81,7 +107,7 @@ export class VendedoresService {
       {
         nombre: 'leandro gonzalez',
         email: 'leandro@example.com',
-        password: '5678',
+        password: this.defaultPassword,
         ruess: '9510',
         descripcionNegocio: 'Productos artesanales orientados a ferias regionales.',
         integrantesEquipo: ['Leandro Gonzalez'],
@@ -92,7 +118,7 @@ export class VendedoresService {
       {
         nombre: 'Francisco saavedra',
         email: 'francisco@example.com',
-        password: '91011',
+        password: this.defaultPassword,
         ruess: '9533',
         descripcionNegocio: 'Catalogo de alimentos y bebidas de produccion familiar.',
         integrantesEquipo: ['Francisco Saavedra', 'Paula Rojas'],
@@ -103,7 +129,7 @@ export class VendedoresService {
       {
         nombre: 'ulises Guzman',
         email: 'ulises@example.com',
-        password: '121314',
+        password: this.defaultPassword,
         ruess: '9602',
         descripcionNegocio: 'Servicios de hoteleria y gastronomia para eventos.',
         integrantesEquipo: ['Ulises Guzman', 'Micaela Cruz'],
@@ -151,6 +177,7 @@ export class VendedoresService {
       ubicacion: createVendedoreDto.ubicacion ?? null,
       whatsapp: createVendedoreDto.whatsapp ?? null,
       telefono: createVendedoreDto.telefono ?? null,
+      logoUrl: createVendedoreDto.logoUrl ?? null,
       passwordHash: this.hashPassword(createVendedoreDto.password),
     });
 
@@ -161,8 +188,11 @@ export class VendedoresService {
   async login(loginDto: LoginVendedoreDto) {
     await this.ensureSeedUsers();
 
+    const email = String(loginDto.email ?? '').trim().toLowerCase();
+    const password = String(loginDto.password ?? '');
+
     const vendedor = await this.vendedoresRepository.findOne({
-      where: { email: loginDto.email },
+      where: { email },
     });
 
     if (!vendedor) {
@@ -173,7 +203,7 @@ export class VendedoresService {
       throw new UnauthorizedException('Tu cuenta esta pendiente de aprobacion');
     }
 
-    const isValid = vendedor.passwordHash === this.hashPassword(loginDto.password);
+    const isValid = vendedor.passwordHash === this.hashPassword(password);
     if (!isValid) {
       throw new UnauthorizedException('Credenciales incorrectas');
     }
@@ -242,9 +272,64 @@ export class VendedoresService {
     if (updateVendedoreDto.telefono !== undefined) {
       vendedor.telefono = updateVendedoreDto.telefono || null;
     }
+    if (updateVendedoreDto.logoUrl !== undefined) {
+      vendedor.logoUrl = updateVendedoreDto.logoUrl || null;
+    }
 
     const saved = await this.vendedoresRepository.save(vendedor);
     return this.sanitize(saved);
+  }
+
+  async updateLogo(id: number, logoUrl: string | null) {
+    const vendedor = await this.vendedoresRepository.findOne({ where: { id } });
+    if (!vendedor) {
+      throw new NotFoundException('Usuario no encontrado');
+    }
+
+    vendedor.logoUrl = logoUrl?.trim() ? logoUrl : null;
+    const saved = await this.vendedoresRepository.save(vendedor);
+    return this.sanitize(saved);
+  }
+
+  async resetAllPasswordsToDefault() {
+    await this.ensureSeedUsers();
+
+    const result = await this.vendedoresRepository
+      .createQueryBuilder()
+      .update(Vendedor)
+      .set({ passwordHash: this.hashPassword(this.defaultPassword) })
+      .execute();
+
+    return {
+      message: 'Contrasenas restablecidas correctamente',
+      updated: result.affected ?? 0,
+      defaultPassword: this.defaultPassword,
+    };
+  }
+
+  async changePassword(id: number, currentPassword: string, newPassword: string) {
+    const vendedor = await this.vendedoresRepository.findOne({ where: { id } });
+    if (!vendedor) {
+      throw new NotFoundException('Usuario no encontrado');
+    }
+
+    if (newPassword.length < 4) {
+      throw new ConflictException('La nueva contrasena debe tener al menos 4 caracteres');
+    }
+
+    const currentMatches = vendedor.passwordHash === this.hashPassword(currentPassword);
+    if (!currentMatches) {
+      throw new UnauthorizedException('La contrasena actual es incorrecta');
+    }
+
+    if (currentPassword === newPassword) {
+      throw new ConflictException('La nueva contrasena debe ser diferente a la actual');
+    }
+
+    vendedor.passwordHash = this.hashPassword(newPassword);
+    await this.vendedoresRepository.save(vendedor);
+
+    return { message: 'Contrasena actualizada correctamente' };
   }
 
   async makeAdministrator(id: number) {

@@ -36,6 +36,9 @@ export class Vendedor {
 	@Column({ type: 'text', nullable: true })
 	telefono: string | null;
 
+	@Column({ name: 'logo_url', type: 'text', nullable: true })
+	logoUrl: string | null;
+
 	@Column({ name: 'password_hash', length: 128 })
 	passwordHash: string;
 
