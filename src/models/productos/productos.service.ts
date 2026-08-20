@@ -1,17 +1,22 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CreateProductoDto } from './dto/create-producto.dto';
 import { UpdateProductoDto } from './dto/update-producto.dto';
 import { Producto } from './entities/producto.entity';
-import { Vendedor} from '../vendedores/entities/vendedore.entity';
+import { Vendedor } from '../vendedores/entities/vendedore.entity';
 
 const normalizarBooleano = (valor: unknown): boolean => {
   if (typeof valor === 'boolean') return valor;
   if (typeof valor === 'number') return valor === 1;
   if (typeof valor === 'string') {
     const normalizado = valor.trim().toLowerCase();
-    if (['true', '1', 'si', 'sí', 'yes', 'on'].includes(normalizado)) return true;
+    if (['true', '1', 'si', 'sí', 'yes', 'on'].includes(normalizado))
+      return true;
     if (['false', '0', 'no', 'off', ''].includes(normalizado)) return false;
   }
   return false;
@@ -28,7 +33,9 @@ export class ProductosService {
 
   async create(createProductoDto: CreateProductoDto) {
     if (!createProductoDto.vendedorId) {
-      throw new BadRequestException('El producto debe estar asignado a un usuario');
+      throw new BadRequestException(
+        'El producto debe estar asignado a un usuario',
+      );
     }
 
     const vendedor = await this.vendedoresRepository.findOne({
@@ -48,22 +55,25 @@ export class ProductosService {
       imagenUrl3: createProductoDto.imagenUrl3 ?? null,
       imagenUrl4: createProductoDto.imagenUrl4 ?? null,
       vendedorId: vendedor.id,
-	  destacado: normalizarBooleano(createProductoDto.destacado),
+      destacado: normalizarBooleano(createProductoDto.destacado),
     });
 
     return this.productosRepository.save(producto);
   }
 
-  findAll(vendedorId?: number) {
+  findAll(vendedorId?: number, page = 1, pageSize = 50) {
+    const pagination = { skip: (page - 1) * pageSize, take: pageSize };
     if (vendedorId) {
       return this.productosRepository.find({
         where: { vendedorId },
         order: { id: 'DESC' },
+        ...pagination,
       });
     }
 
     return this.productosRepository.find({
       order: { id: 'DESC' },
+      ...pagination,
     });
   }
 
@@ -80,7 +90,9 @@ export class ProductosService {
 
     if (updateProductoDto.vendedorId !== undefined) {
       if (updateProductoDto.vendedorId === null) {
-        throw new BadRequestException('Un producto siempre debe pertenecer a un usuario');
+        throw new BadRequestException(
+          'Un producto siempre debe pertenecer a un usuario',
+        );
       } else {
         const vendedor = await this.vendedoresRepository.findOne({
           where: { id: updateProductoDto.vendedorId },
@@ -116,10 +128,10 @@ export class ProductosService {
         updateProductoDto.imagenUrl4 !== undefined
           ? updateProductoDto.imagenUrl4
           : producto.imagenUrl4,
-	  destacado:
-		updateProductoDto.destacado !== undefined
-      ? normalizarBooleano(updateProductoDto.destacado)
-		  : producto.destacado,
+      destacado:
+        updateProductoDto.destacado !== undefined
+          ? normalizarBooleano(updateProductoDto.destacado)
+          : producto.destacado,
     });
 
     return this.productosRepository.save(producto);

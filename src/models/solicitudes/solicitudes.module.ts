@@ -7,8 +7,8 @@ import { SolicitudesController } from './solicitudes.controller';
 import { SolicitudesService } from './solicitudes.service';
 
 @Module({
-	imports: [TypeOrmModule.forFeature([Solicitud, Vendedor, Producto])],
-	controllers: [SolicitudesController],
-	providers: [SolicitudesService],
+  imports: [TypeOrmModule.forFeature([Solicitud, Vendedor, Producto])],
+  controllers: [SolicitudesController],
+  providers: [SolicitudesService],
 })
 export class SolicitudesModule {}

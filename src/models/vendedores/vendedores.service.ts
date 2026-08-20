@@ -5,25 +5,22 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { createHash } from 'node:crypto';
+import { JwtService } from '@nestjs/jwt';
 import { Repository } from 'typeorm';
+import { PasswordService } from '../../auth/password.service';
 import { CreateVendedoreDto } from './dto/create-vendedore.dto';
 import { UpdateVendedoreDto } from './dto/update-vendedore.dto';
 import { LoginVendedoreDto } from './dto/login-vendedore.dto';
-import { Vendedor} from './entities/vendedore.entity';
+import { Vendedor } from './entities/vendedore.entity';
 
 @Injectable()
 export class VendedoresService {
-  private readonly defaultPassword = '1234';
-
   constructor(
     @InjectRepository(Vendedor)
     private readonly vendedoresRepository: Repository<Vendedor>,
+    private readonly passwordService: PasswordService,
+    private readonly jwtService: JwtService,
   ) {}
-
-  private hashPassword(password: string) {
-    return createHash('sha256').update(password).digest('hex');
-  }
 
   private sanitize(vendedor: Vendedor) {
     return {
@@ -42,125 +39,25 @@ export class VendedoresService {
     };
   }
 
-  async ensureSeedUsers() {
-    const lucasEmail = 'lucasagustinastesiano@gmail.com';
-
-    const lucas = await this.vendedoresRepository.findOne({
-      where: { email: lucasEmail },
-    });
-
-    if (lucas) {
-      lucas.rol = 'administrador';
-      lucas.estadoSolicitud = 'aprobado';
-      await this.vendedoresRepository.save(lucas);
-    } else {
-      await this.vendedoresRepository.save(
-        this.vendedoresRepository.create({
-          nombre: 'Lucas Astesiano',
-          email: lucasEmail,
-          rol: 'administrador',
-          estadoSolicitud: 'aprobado',
-          ruess: '9499',
-          descripcionNegocio: 'Emprendimiento local con foco en produccion textil y ventas minoristas.',
-          integrantesEquipo: ['Fabiana Astudillo', 'Horacio Rios'],
-          ubicacion: 'San Jose, Guaymallen',
-          whatsapp: '+549261245684',
-          telefono: '261245684',
-          passwordHash: this.hashPassword(this.defaultPassword),
-        }),
-      );
-    }
-
-    const count = await this.vendedoresRepository.count();
-    if (count > 0) {
-      return;
-    }
-
-    type SeedUser = {
-      nombre: string;
-      email: string;
-      password: string;
-      rol?: 'usuario' | 'administrador';
-      estadoSolicitud?: 'pendiente' | 'aprobado' | 'rechazado';
-      ruess: string;
-      descripcionNegocio: string;
-      integrantesEquipo: string[];
-      ubicacion: string;
-      whatsapp: string;
-      telefono: string;
+  private sanitizePublic(vendedor: Vendedor) {
+    return {
+      id: vendedor.id,
+      nombre: vendedor.nombre,
+      email: vendedor.email,
+      ruess: vendedor.ruess,
+      descripcionNegocio: vendedor.descripcionNegocio,
+      integrantesEquipo: vendedor.integrantesEquipo ?? [],
+      ubicacion: vendedor.ubicacion,
+      whatsapp: vendedor.whatsapp,
+      telefono: vendedor.telefono,
+      logoUrl: vendedor.logoUrl,
     };
-
-    const seedUsers: SeedUser[] = [
-      {
-        nombre: 'Lucas Astesiano',
-        email: 'lucasagustinastesiano@gmail.com',
-        password: '1234',
-        rol: 'administrador',
-        estadoSolicitud: 'aprobado',
-        ruess: '9499',
-        descripcionNegocio: 'Emprendimiento local con foco en produccion textil y ventas minoristas.',
-        integrantesEquipo: ['Fabiana Astudillo', 'Horacio Rios'],
-        ubicacion: 'San Jose, Guaymallen',
-        whatsapp: '+549261245684',
-        telefono: '261245684',
-      },
-      {
-        nombre: 'leandro gonzalez',
-        email: 'leandro@example.com',
-        password: this.defaultPassword,
-        ruess: '9510',
-        descripcionNegocio: 'Productos artesanales orientados a ferias regionales.',
-        integrantesEquipo: ['Leandro Gonzalez'],
-        ubicacion: 'Ciudad de Mendoza',
-        whatsapp: '+5492614000001',
-        telefono: '2614000001',
-      },
-      {
-        nombre: 'Francisco saavedra',
-        email: 'francisco@example.com',
-        password: this.defaultPassword,
-        ruess: '9533',
-        descripcionNegocio: 'Catalogo de alimentos y bebidas de produccion familiar.',
-        integrantesEquipo: ['Francisco Saavedra', 'Paula Rojas'],
-        ubicacion: 'Las Heras',
-        whatsapp: '+5492614000002',
-        telefono: '2614000002',
-      },
-      {
-        nombre: 'ulises Guzman',
-        email: 'ulises@example.com',
-        password: this.defaultPassword,
-        ruess: '9602',
-        descripcionNegocio: 'Servicios de hoteleria y gastronomia para eventos.',
-        integrantesEquipo: ['Ulises Guzman', 'Micaela Cruz'],
-        ubicacion: 'Godoy Cruz',
-        whatsapp: '+5492614000003',
-        telefono: '2614000003',
-      },
-    ];
-
-    const vendorSeeds = seedUsers.map((user) =>
-      this.vendedoresRepository.create({
-        nombre: user.nombre,
-        email: user.email,
-        rol: user.rol ?? 'usuario',
-        estadoSolicitud: user.estadoSolicitud ?? 'aprobado',
-        ruess: user.ruess,
-        descripcionNegocio: user.descripcionNegocio,
-        integrantesEquipo: user.integrantesEquipo,
-        ubicacion: user.ubicacion,
-        whatsapp: user.whatsapp,
-        telefono: user.telefono,
-        passwordHash: this.hashPassword(user.password),
-      }),
-    );
-
-    await this.vendedoresRepository.save(vendorSeeds);
   }
 
   async create(createVendedoreDto: CreateVendedoreDto) {
+    const email = createVendedoreDto.email.trim().toLowerCase();
     const found = await this.vendedoresRepository.findOne({
-      where: { email: createVendedoreDto.email },
+      where: { email },
     });
     if (found) {
       throw new ConflictException('El email ya existe');
@@ -168,8 +65,8 @@ export class VendedoresService {
 
     const created = this.vendedoresRepository.create({
       nombre: createVendedoreDto.nombre,
-      email: createVendedoreDto.email,
-      rol: createVendedoreDto.rol ?? 'usuario',
+      email,
+      rol: 'usuario',
       estadoSolicitud: 'pendiente',
       ruess: createVendedoreDto.ruess ?? null,
       descripcionNegocio: createVendedoreDto.descripcionNegocio ?? null,
@@ -178,7 +75,9 @@ export class VendedoresService {
       whatsapp: createVendedoreDto.whatsapp ?? null,
       telefono: createVendedoreDto.telefono ?? null,
       logoUrl: createVendedoreDto.logoUrl ?? null,
-      passwordHash: this.hashPassword(createVendedoreDto.password),
+      passwordHash: await this.passwordService.hash(
+        createVendedoreDto.password,
+      ),
     });
 
     const saved = await this.vendedoresRepository.save(created);
@@ -186,9 +85,9 @@ export class VendedoresService {
   }
 
   async login(loginDto: LoginVendedoreDto) {
-    await this.ensureSeedUsers();
-
-    const email = String(loginDto.email ?? '').trim().toLowerCase();
+    const email = String(loginDto.email ?? '')
+      .trim()
+      .toLowerCase();
     const password = String(loginDto.password ?? '');
 
     const vendedor = await this.vendedoresRepository.findOne({
@@ -203,31 +102,50 @@ export class VendedoresService {
       throw new UnauthorizedException('Tu cuenta esta pendiente de aprobacion');
     }
 
-    const isValid = vendedor.passwordHash === this.hashPassword(password);
-    if (!isValid) {
+    const verification = await this.passwordService.verify(
+      vendedor.passwordHash,
+      password,
+    );
+    if (!verification.valid) {
       throw new UnauthorizedException('Credenciales incorrectas');
     }
+    const passwordChangeRequired = verification.legacy;
+    const user = { ...this.sanitize(vendedor), passwordChangeRequired };
+    const accessToken = await this.jwtService.signAsync({
+      sub: vendedor.id,
+      email: vendedor.email,
+      nombre: vendedor.nombre,
+      rol: vendedor.rol,
+      passwordChangeRequired,
+      sessionVersion: vendedor.sessionVersion,
+    });
 
     return {
       message: 'Login exitoso',
-      user: this.sanitize(vendedor),
+      user,
+      accessToken,
     };
   }
 
-  async findAll() {
-    await this.ensureSeedUsers();
+  async findAll(page = 1, pageSize = 50, includePrivate = false) {
     const vendedores = await this.vendedoresRepository.find({
       order: { id: 'ASC' },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
     });
-    return vendedores.map((vendedor) => this.sanitize(vendedor));
+    return vendedores.map((vendedor) =>
+      includePrivate ? this.sanitize(vendedor) : this.sanitizePublic(vendedor),
+    );
   }
 
-  async findOne(id: number) {
+  async findOne(id: number, includePrivate = false) {
     const vendedor = await this.vendedoresRepository.findOne({ where: { id } });
     if (!vendedor) {
       throw new NotFoundException('Usuario no encontrado');
     }
-    return this.sanitize(vendedor);
+    return includePrivate
+      ? this.sanitize(vendedor)
+      : this.sanitizePublic(vendedor);
   }
 
   async update(id: number, updateVendedoreDto: UpdateVendedoreDto) {
@@ -236,9 +154,10 @@ export class VendedoresService {
       throw new NotFoundException('Usuario no encontrado');
     }
 
-    if (updateVendedoreDto.email && updateVendedoreDto.email !== vendedor.email) {
+    const normalizedEmail = updateVendedoreDto.email?.trim().toLowerCase();
+    if (normalizedEmail && normalizedEmail !== vendedor.email) {
       const existingEmail = await this.vendedoresRepository.findOne({
-        where: { email: updateVendedoreDto.email },
+        where: { email: normalizedEmail },
       });
       if (existingEmail) {
         throw new ConflictException('El email ya existe');
@@ -248,17 +167,15 @@ export class VendedoresService {
     if (updateVendedoreDto.nombre) {
       vendedor.nombre = updateVendedoreDto.nombre;
     }
-    if (updateVendedoreDto.email) {
-      vendedor.email = updateVendedoreDto.email;
-    }
-    if (updateVendedoreDto.password) {
-      vendedor.passwordHash = this.hashPassword(updateVendedoreDto.password);
+    if (normalizedEmail) {
+      vendedor.email = normalizedEmail;
     }
     if (updateVendedoreDto.ruess !== undefined) {
       vendedor.ruess = updateVendedoreDto.ruess || null;
     }
     if (updateVendedoreDto.descripcionNegocio !== undefined) {
-      vendedor.descripcionNegocio = updateVendedoreDto.descripcionNegocio || null;
+      vendedor.descripcionNegocio =
+        updateVendedoreDto.descripcionNegocio || null;
     }
     if (updateVendedoreDto.integrantesEquipo !== undefined) {
       vendedor.integrantesEquipo = updateVendedoreDto.integrantesEquipo;
@@ -291,45 +208,35 @@ export class VendedoresService {
     return this.sanitize(saved);
   }
 
-  async resetAllPasswordsToDefault() {
-    await this.ensureSeedUsers();
-
-    const result = await this.vendedoresRepository
-      .createQueryBuilder()
-      .update(Vendedor)
-      .set({ passwordHash: this.hashPassword(this.defaultPassword) })
-      .execute();
-
-    return {
-      message: 'Contrasenas restablecidas correctamente',
-      updated: result.affected ?? 0,
-      defaultPassword: this.defaultPassword,
-    };
-  }
-
-  async changePassword(id: number, currentPassword: string, newPassword: string) {
+  async changePassword(
+    id: number,
+    currentPassword: string,
+    newPassword: string,
+  ) {
     const vendedor = await this.vendedoresRepository.findOne({ where: { id } });
     if (!vendedor) {
       throw new NotFoundException('Usuario no encontrado');
     }
 
-    if (newPassword.length < 4) {
-      throw new ConflictException('La nueva contrasena debe tener al menos 4 caracteres');
-    }
-
-    const currentMatches = vendedor.passwordHash === this.hashPassword(currentPassword);
-    if (!currentMatches) {
-      throw new UnauthorizedException('La contrasena actual es incorrecta');
+    const currentMatches = await this.passwordService.verify(
+      vendedor.passwordHash,
+      currentPassword,
+    );
+    if (!currentMatches.valid) {
+      throw new UnauthorizedException('La contraseña actual es incorrecta');
     }
 
     if (currentPassword === newPassword) {
-      throw new ConflictException('La nueva contrasena debe ser diferente a la actual');
+      throw new ConflictException(
+        'La nueva contraseña debe ser diferente a la actual',
+      );
     }
 
-    vendedor.passwordHash = this.hashPassword(newPassword);
+    vendedor.passwordHash = await this.passwordService.hash(newPassword);
+    vendedor.sessionVersion = (vendedor.sessionVersion ?? 0) + 1;
     await this.vendedoresRepository.save(vendedor);
 
-    return { message: 'Contrasena actualizada correctamente' };
+    return { message: 'contraseña actualizada correctamente' };
   }
 
   async makeAdministrator(id: number) {
@@ -340,6 +247,7 @@ export class VendedoresService {
 
     vendedor.rol = 'administrador';
     vendedor.estadoSolicitud = 'aprobado';
+    vendedor.sessionVersion = (vendedor.sessionVersion ?? 0) + 1;
 
     const saved = await this.vendedoresRepository.save(vendedor);
     return this.sanitize(saved);

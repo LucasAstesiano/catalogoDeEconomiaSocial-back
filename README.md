@@ -21,6 +21,22 @@
   <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
   [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
 
+## Almacenamiento de imagenes en S3
+
+`POST /api/v1/uploads/images/:folder` recibe `multipart/form-data` con el archivo en el
+campo `file`. Los destinos validos son `productos` y `vendedores`. Se aceptan JPG,
+PNG, WebP y GIF de hasta 5 MB.
+
+1. Copiar `.env.example` a `.env` y completar la configuracion S3. En AWS se
+   recomienda usar un rol IAM con `s3:PutObject` en vez de claves permanentes.
+2. Configurar `S3_PUBLIC_URL` con el dominio publico del bucket o CDN. Los objetos
+   se suben sin ACL; la lectura se habilita mediante la politica del bucket o CDN.
+3. Configurar ese dominio en el frontend como `NEXT_PUBLIC_S3_PUBLIC_URL` y
+   reiniciar/recompilar Next.js.
+
+La URL resultante se guarda en los campos existentes, por lo que no hace falta una
+migracion de base de datos.
+
 ## Description
 
 [Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
