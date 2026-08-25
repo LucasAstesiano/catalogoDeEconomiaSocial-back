@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
   IsArray,
   IsEmail,
   IsIn,
@@ -37,7 +38,9 @@ export class RegistrationPayloadDto {
 
   @IsOptional()
   @IsArray()
+  @ArrayMaxSize(50)
   @IsString({ each: true })
+  @MaxLength(120, { each: true })
   integrantesEquipo?: string[];
 
   @IsOptional()

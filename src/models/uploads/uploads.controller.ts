@@ -52,16 +52,11 @@ export class UploadsController {
     @Query('key') key: string,
     @Res({ passthrough: true }) response: Response,
   ) {
-    if (
-      !key ||
-      (!key.startsWith('productos/') && !key.startsWith('vendedores/'))
-    ) {
-      throw new BadRequestException('La clave de imagen no es valida.');
-    }
-
     const image = await this.uploadsService.getImage(key);
     response.set({
       'Content-Type': image.contentType,
+      'Content-Disposition': 'inline',
+      'X-Content-Type-Options': 'nosniff',
       'Cache-Control': 'public, max-age=31536000, immutable',
     });
     return new StreamableFile(image.bytes);

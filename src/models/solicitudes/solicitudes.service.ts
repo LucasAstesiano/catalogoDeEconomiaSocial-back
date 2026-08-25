@@ -117,7 +117,10 @@ export class SolicitudesService {
           : null) ??
         null,
       solicitanteEmail:
-        requester?.email ?? createSolicitudDto.solicitanteEmail ?? null,
+        requester?.email ??
+        (createSolicitudDto.tipo === 'registro_usuario'
+          ? String(createSolicitudDto.payload.email).trim().toLowerCase()
+          : (createSolicitudDto.solicitanteEmail ?? null)),
       solicitanteNombre:
         requester?.nombre ?? createSolicitudDto.solicitanteNombre ?? null,
       entidadObjetivo: createSolicitudDto.entidadObjetivo ?? null,
@@ -147,7 +150,10 @@ export class SolicitudesService {
   async approve(id: number, resolverId: number) {
     return this.dataSource.transaction(async (manager) => {
       const solicitudes = manager.getRepository(Solicitud);
-      const solicitud = await solicitudes.findOne({ where: { id } });
+      const solicitud = await solicitudes.findOne({
+        where: { id },
+        lock: { mode: 'pessimistic_write' },
+      });
       if (!solicitud) throw new NotFoundException('Solicitud no encontrada');
       if (solicitud.estado !== 'pendiente')
         return this.toSafeResponse(solicitud);
@@ -163,7 +169,10 @@ export class SolicitudesService {
   async reject(id: number, resolverId: number) {
     return this.dataSource.transaction(async (manager) => {
       const solicitudes = manager.getRepository(Solicitud);
-      const solicitud = await solicitudes.findOne({ where: { id } });
+      const solicitud = await solicitudes.findOne({
+        where: { id },
+        lock: { mode: 'pessimistic_write' },
+      });
       if (!solicitud) throw new NotFoundException('Solicitud no encontrada');
       if (solicitud.estado !== 'pendiente')
         return this.toSafeResponse(solicitud);

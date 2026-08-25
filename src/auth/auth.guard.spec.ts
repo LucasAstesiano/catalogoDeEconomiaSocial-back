@@ -1,4 +1,4 @@
-import { UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import type { ExecutionContext } from '@nestjs/common';
 import type { Reflector } from '@nestjs/core';
 import type { JwtService } from '@nestjs/jwt';
@@ -29,6 +29,12 @@ describe('AuthGuard revocacion de sesiones', () => {
   );
 
   beforeEach(() => jest.clearAllMocks());
+
+  afterEach(() => {
+    request.method = 'GET';
+    request.originalUrl = '/api/v1/vendedores/session';
+    request.path = '/vendedores/session';
+  });
 
   it('rechaza un token cuya version fue revocada', async () => {
     jwtService.verifyAsync.mockResolvedValue({ sub: 4, sessionVersion: 2 });
@@ -62,5 +68,69 @@ describe('AuthGuard revocacion de sesiones', () => {
 
     await expect(guard.canActivate(context)).resolves.toBe(true);
     expect(request).toHaveProperty('user.rol', 'usuario');
+  });
+
+  it('permite cambiar la contraseña legacy usando la ruta con prefijo global', async () => {
+    request.method = 'PATCH';
+    request.originalUrl = '/api/v1/vendedores/4/password';
+    request.path = '/api/v1/vendedores/4/password';
+    jwtService.verifyAsync.mockResolvedValue({
+      sub: 4,
+      sessionVersion: 3,
+      passwordChangeRequired: true,
+    });
+    vendedoresRepository.findOne.mockResolvedValue({
+      id: 4,
+      email: 'legacy@ejemplo.com',
+      nombre: 'Legacy',
+      rol: 'usuario',
+      sessionVersion: 3,
+      estadoSolicitud: 'aprobado',
+    });
+
+    await expect(guard.canActivate(context)).resolves.toBe(true);
+  });
+
+  it('permite consultar la sesión para mostrar el cambio obligatorio', async () => {
+    request.originalUrl = '/api/v1/vendedores/session';
+    request.path = '/api/v1/vendedores/session';
+    jwtService.verifyAsync.mockResolvedValue({
+      sub: 4,
+      sessionVersion: 3,
+      passwordChangeRequired: true,
+    });
+    vendedoresRepository.findOne.mockResolvedValue({
+      id: 4,
+      email: 'legacy@ejemplo.com',
+      nombre: 'Legacy',
+      rol: 'usuario',
+      sessionVersion: 3,
+      estadoSolicitud: 'aprobado',
+    });
+
+    await expect(guard.canActivate(context)).resolves.toBe(true);
+  });
+
+  it('conserva el error especifico cuando el usuario legacy accede a otra ruta', async () => {
+    request.originalUrl = '/api/v1/productos';
+    request.path = '/api/v1/productos';
+    jwtService.verifyAsync.mockResolvedValue({
+      sub: 4,
+      sessionVersion: 3,
+      passwordChangeRequired: true,
+    });
+    vendedoresRepository.findOne.mockResolvedValue({
+      id: 4,
+      email: 'legacy@ejemplo.com',
+      nombre: 'Legacy',
+      rol: 'usuario',
+      sessionVersion: 3,
+      estadoSolicitud: 'aprobado',
+    });
+
+    await expect(guard.canActivate(context)).rejects.toMatchObject({
+      constructor: ForbiddenException,
+      message: 'Debes cambiar tu contraseña antes de continuar',
+    });
   });
 });

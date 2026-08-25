@@ -130,6 +130,7 @@ describe('SolicitudesService respuestas seguras', () => {
     expect(JSON.stringify(result)).not.toMatch(/password|secret|hash/i);
     expect(solicitudesRepository.save).toHaveBeenCalledWith(
       expect.objectContaining({
+        solicitanteEmail: 'persona@ejemplo.com',
         // Jest construye este matcher dinamicamente y su tipo publico es `any`.
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         payload: expect.objectContaining({

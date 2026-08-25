@@ -9,6 +9,7 @@
   },
   "license": "UNLICENSED",
   "scripts": {
+    "admin:reset-password": "node --env-file-if-exists=.env scripts/reset-admin-password.js",
     "images:import": "node scripts/import-product-images.js",
     "logos:import": "node scripts/import-vendor-logos.js",
     "security:migrate": "node scripts/migrate-security-data.js",

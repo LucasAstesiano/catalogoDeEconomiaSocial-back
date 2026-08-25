@@ -55,6 +55,16 @@ export class Vendedor {
   @Column({ name: 'session_version', type: 'integer', default: 0 })
   sessionVersion: number;
 
+  @Column({ name: 'password_change_required', type: 'boolean', default: false })
+  passwordChangeRequired: boolean;
+
+  @Column({
+    name: 'temporary_password_expires_at',
+    type: 'timestamptz',
+    nullable: true,
+  })
+  temporaryPasswordExpiresAt: Date | null;
+
   @OneToMany(() => Producto, (producto) => producto.vendedor)
   productos: Producto[];
 }

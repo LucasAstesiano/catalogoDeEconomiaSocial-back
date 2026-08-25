@@ -18,6 +18,20 @@ export type ImageFolder = 'productos' | 'vendedores';
 
 @Injectable()
 export class UploadsService {
+  private static readonly MANUAL_IMAGE_KEY =
+    /^(productos|vendedores)\/\d{4}-\d{2}-\d{2}\/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(jpg|jpeg|png|webp|gif)$/i;
+  private static readonly IMPORTED_PRODUCT_IMAGE_KEY =
+    /^productos\/importados\/\d+\/(inicial|final)-[0-9a-f]{16}\.(jpg|jpeg|png|webp|gif)$/i;
+  private static readonly IMPORTED_VENDOR_IMAGE_KEY =
+    /^vendedores\/importados\/\d+\/logo-[0-9a-f]{16}\.(jpg|jpeg|png|webp|gif)$/i;
+  private static readonly CONTENT_TYPES: Record<string, string> = {
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.png': 'image/png',
+    '.webp': 'image/webp',
+    '.gif': 'image/gif',
+  };
+
   private readonly logger = new Logger(UploadsService.name);
   private readonly environment = resolveEnvironment(process.env);
   private readonly bucket = this.environment.S3_BUCKET;
@@ -92,6 +106,9 @@ export class UploadsService {
       );
     }
 
+    const expectedContentType = this.validateImageKey(key);
+    let bytes: Uint8Array;
+
     try {
       const object = await this.client.send(
         new GetObjectCommand({ Bucket: this.bucket, Key: key }),
@@ -99,16 +116,40 @@ export class UploadsService {
       if (!object.Body) {
         throw new Error('El objeto no tiene contenido.');
       }
-      return {
-        bytes: await object.Body.transformToByteArray(),
-        contentType: object.ContentType ?? 'application/octet-stream',
-      };
+      bytes = await object.Body.transformToByteArray();
     } catch (error) {
       this.logStorageError('get_object', error);
       throw new InternalServerErrorException(
         'No se pudo obtener la imagen de S3.',
       );
     }
+
+    const detectedContentType = this.detectImageMime(Buffer.from(bytes));
+    if (!detectedContentType || detectedContentType !== expectedContentType) {
+      throw new BadRequestException(
+        'El objeto solicitado no corresponde a una imagen valida.',
+      );
+    }
+
+    return { bytes, contentType: detectedContentType };
+  }
+
+  validateImageKey(key: string) {
+    const validKey =
+      typeof key === 'string' &&
+      (UploadsService.MANUAL_IMAGE_KEY.test(key) ||
+        UploadsService.IMPORTED_PRODUCT_IMAGE_KEY.test(key) ||
+        UploadsService.IMPORTED_VENDOR_IMAGE_KEY.test(key));
+    if (!validKey) {
+      throw new BadRequestException('La clave de imagen no es valida.');
+    }
+
+    const contentType =
+      UploadsService.CONTENT_TYPES[extname(key).toLowerCase()];
+    if (!contentType) {
+      throw new BadRequestException('La extension de imagen no es valida.');
+    }
+    return contentType;
   }
 
   private safeExtension(filename: string, mimeType: string) {

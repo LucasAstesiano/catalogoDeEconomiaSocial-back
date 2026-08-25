@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
   UnauthorizedException,
@@ -15,6 +16,9 @@ import { Vendedor } from './entities/vendedore.entity';
 
 @Injectable()
 export class VendedoresService {
+  private static readonly DUMMY_PASSWORD_HASH =
+    '$argon2id$v=19$m=19456,p=1,t=2$dcMoRC7NnjHhrW2aApdotA$eKdWPt2/fzmexACEEvwCKZ4/OPnwWdXujSHrWleg9d4';
+
   constructor(
     @InjectRepository(Vendedor)
     private readonly vendedoresRepository: Repository<Vendedor>,
@@ -94,22 +98,25 @@ export class VendedoresService {
       where: { email },
     });
 
-    if (!vendedor) {
+    const verification = await this.passwordService.verify(
+      vendedor?.passwordHash ?? VendedoresService.DUMMY_PASSWORD_HASH,
+      password,
+    );
+    if (!vendedor || !verification.valid) {
       throw new UnauthorizedException('Credenciales incorrectas');
     }
-
     if (vendedor.estadoSolicitud !== 'aprobado') {
       throw new UnauthorizedException('Tu cuenta esta pendiente de aprobacion');
     }
-
-    const verification = await this.passwordService.verify(
-      vendedor.passwordHash,
-      password,
-    );
-    if (!verification.valid) {
-      throw new UnauthorizedException('Credenciales incorrectas');
+    if (
+      vendedor.passwordChangeRequired &&
+      (!vendedor.temporaryPasswordExpiresAt ||
+        vendedor.temporaryPasswordExpiresAt.getTime() <= Date.now())
+    ) {
+      throw new UnauthorizedException('La contraseña temporal venció');
     }
-    const passwordChangeRequired = verification.legacy;
+    const passwordChangeRequired =
+      verification.legacy || vendedor.passwordChangeRequired;
     const user = { ...this.sanitize(vendedor), passwordChangeRequired };
     const accessToken = await this.jwtService.signAsync({
       sub: vendedor.id,
@@ -234,12 +241,71 @@ export class VendedoresService {
 
     vendedor.passwordHash = await this.passwordService.hash(newPassword);
     vendedor.sessionVersion = (vendedor.sessionVersion ?? 0) + 1;
+    vendedor.passwordChangeRequired = false;
+    vendedor.temporaryPasswordExpiresAt = null;
     await this.vendedoresRepository.save(vendedor);
 
     return { message: 'contraseña actualizada correctamente' };
   }
 
-  async makeAdministrator(id: number) {
+  async resetPassword(
+    id: number,
+    temporaryPassword: string,
+    adminId: number,
+    adminPassword: string,
+  ) {
+    const admin = await this.vendedoresRepository.findOne({
+      where: { id: adminId },
+    });
+    if (!admin || admin.rol !== 'administrador') {
+      throw new ForbiddenException('Solo un administrador puede restablecerla');
+    }
+    const adminVerification = await this.passwordService.verify(
+      admin.passwordHash,
+      adminPassword,
+    );
+    if (!adminVerification.valid) {
+      throw new UnauthorizedException(
+        'La contraseña actual del administrador es incorrecta',
+      );
+    }
+
+    const vendedor = await this.vendedoresRepository.findOne({ where: { id } });
+    if (!vendedor) {
+      throw new NotFoundException('Usuario no encontrado');
+    }
+
+    vendedor.passwordHash = await this.passwordService.hash(temporaryPassword);
+    vendedor.sessionVersion = (vendedor.sessionVersion ?? 0) + 1;
+    vendedor.passwordChangeRequired = true;
+    vendedor.temporaryPasswordExpiresAt = new Date(Date.now() + 30 * 60 * 1000);
+    await this.vendedoresRepository.save(vendedor);
+
+    return {
+      message:
+        'Contraseña restablecida. Vence en 30 minutos y deberá cambiarse al iniciar sesión',
+    };
+  }
+
+  async makeAdministrator(id: number, adminId: number, adminPassword: string) {
+    const admin = await this.vendedoresRepository.findOne({
+      where: { id: adminId },
+    });
+    if (!admin || admin.rol !== 'administrador') {
+      throw new ForbiddenException(
+        'Solo un administrador puede promover cuentas',
+      );
+    }
+    const adminVerification = await this.passwordService.verify(
+      admin.passwordHash,
+      adminPassword,
+    );
+    if (!adminVerification.valid) {
+      throw new UnauthorizedException(
+        'La contraseña actual del administrador es incorrecta',
+      );
+    }
+
     const vendedor = await this.vendedoresRepository.findOne({ where: { id } });
     if (!vendedor) {
       throw new NotFoundException('Usuario no encontrado');
@@ -253,11 +319,28 @@ export class VendedoresService {
     return this.sanitize(saved);
   }
 
-  async remove(id: number) {
+  async remove(id: number, requesterId: number) {
+    if (id === requesterId) {
+      throw new ForbiddenException(
+        'No podes eliminar tu propia cuenta administradora',
+      );
+    }
+
     const vendedor = await this.vendedoresRepository.findOne({ where: { id } });
     if (!vendedor) {
       throw new NotFoundException('Usuario no encontrado');
     }
+    if (vendedor.rol === 'administrador') {
+      const administratorCount = await this.vendedoresRepository.count({
+        where: { rol: 'administrador' },
+      });
+      if (administratorCount <= 1) {
+        throw new ForbiddenException(
+          'No se puede eliminar la ultima cuenta administradora',
+        );
+      }
+    }
+
     await this.vendedoresRepository.remove(vendedor);
     return { deleted: true, id };
   }

@@ -1,6 +1,7 @@
 import {
   CanActivate,
   ExecutionContext,
+  ForbiddenException,
   Injectable,
   UnauthorizedException,
   Logger,
@@ -77,16 +78,19 @@ export class AuthGuard implements CanActivate {
         nombre: vendedor.nombre,
         rol: vendedor.rol,
       };
-      if (
-        request.user.passwordChangeRequired &&
-        !/^\/vendedores\/\d+\/password$/.test(request.path)
-      ) {
-        throw new UnauthorizedException(
+      const requestPath = (request.originalUrl ?? request.path).split('?')[0];
+      const isPasswordChangeFlow =
+        /^\/(?:api\/v1\/)?vendedores\/(?:session|\d+\/password)$/.test(
+          requestPath,
+        );
+      if (request.user.passwordChangeRequired && !isPasswordChangeFlow) {
+        throw new ForbiddenException(
           'Debes cambiar tu contraseña antes de continuar',
         );
       }
       return true;
-    } catch {
+    } catch (error) {
+      if (error instanceof ForbiddenException) throw error;
       this.logger.warn(
         `Token rechazado method=${request.method} path=${request.originalUrl} ip=${request.ip}`,
       );

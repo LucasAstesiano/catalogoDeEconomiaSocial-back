@@ -18,6 +18,8 @@ import { UpdateVendedoreDto } from './dto/update-vendedore.dto';
 import { LoginVendedoreDto } from './dto/login-vendedore.dto';
 import { ChangePasswordVendedoreDto } from './dto/change-password-vendedore.dto';
 import { UpdateLogoVendedoreDto } from './dto/update-logo-vendedore.dto';
+import { ResetPasswordVendedoreDto } from './dto/reset-password-vendedore.dto';
+import { MakeAdministratorVendedoreDto } from './dto/make-administrator-vendedore.dto';
 import { Public } from '../../auth/public.decorator';
 import { Roles } from '../../auth/roles.decorator';
 import { CurrentUser } from '../../auth/current-user.decorator';
@@ -115,6 +117,7 @@ export class VendedoresController {
 
   /**actualizar vendedor por id */
   @Patch(':id')
+  @Roles('administrador')
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateVendedoreDto: UpdateVendedoreDto,
@@ -126,6 +129,7 @@ export class VendedoresController {
 
   /**cambiar logo vendedor */
   @Patch(':id/logo')
+  @Roles('administrador')
   updateLogo(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateLogoDto: UpdateLogoVendedoreDto,
@@ -150,18 +154,45 @@ export class VendedoresController {
     );
   }
 
+  /**Restablecer contraseña y forzar su cambio en el próximo inicio de sesión. */
+  @Post(':id/password-reset')
+  @Roles('administrador')
+  resetPassword(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() resetPasswordDto: ResetPasswordVendedoreDto,
+    @CurrentUser() admin: AuthenticatedUser,
+  ) {
+    return this.vendedoresService.resetPassword(
+      id,
+      resetPasswordDto.temporaryPassword,
+      admin.sub,
+      resetPasswordDto.adminPassword,
+    );
+  }
+
   /**hacer administrador */
   @Patch(':id/administrador')
   @Roles('administrador')
-  makeAdministrator(@Param('id', ParseIntPipe) id: number) {
-    return this.vendedoresService.makeAdministrator(id);
+  makeAdministrator(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() makeAdministratorDto: MakeAdministratorVendedoreDto,
+    @CurrentUser() admin: AuthenticatedUser,
+  ) {
+    return this.vendedoresService.makeAdministrator(
+      id,
+      admin.sub,
+      makeAdministratorDto.adminPassword,
+    );
   }
 
   /**Eliminar vendedor */
   @Delete(':id')
   @Roles('administrador')
-  remove(@Param('id', ParseIntPipe) id: number) {
-    return this.vendedoresService.remove(id);
+  remove(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() admin: AuthenticatedUser,
+  ) {
+    return this.vendedoresService.remove(id, admin.sub);
   }
 
   /** Verifica que el usuario autenticado sea el dueño del ID o administrador. */
