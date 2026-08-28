@@ -8,6 +8,7 @@ import { JwtService } from '@nestjs/jwt';
 describe('VendedoresService', () => {
   let service: VendedoresService;
   const vendedoresRepository = {
+    find: jest.fn(),
     findOne: jest.fn(),
     save: jest.fn(),
     count: jest.fn(),
@@ -37,6 +38,39 @@ describe('VendedoresService', () => {
 
   it('should be defined', () => {
     expect(service).toBeDefined();
+  });
+
+  it('publica solamente vendedores aprobados', async () => {
+    vendedoresRepository.find.mockResolvedValue([]);
+
+    await service.findAll(1, 50);
+
+    expect(vendedoresRepository.find).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { estadoSolicitud: 'aprobado' },
+      }),
+    );
+  });
+
+  it('no permite consultar publicamente un vendedor no aprobado', async () => {
+    vendedoresRepository.findOne.mockResolvedValue(null);
+
+    await expect(service.findOne(7)).rejects.toThrow('Usuario no encontrado');
+    expect(vendedoresRepository.findOne).toHaveBeenCalledWith({
+      where: { id: 7, estadoSolicitud: 'aprobado' },
+    });
+  });
+
+  it('revoca la sesion en el servidor al cerrar sesion', async () => {
+    const vendedor = { id: 7, sessionVersion: 2 };
+    vendedoresRepository.findOne.mockResolvedValue(vendedor);
+    vendedoresRepository.save.mockResolvedValue(vendedor);
+
+    await service.revokeSessions(7);
+
+    expect(vendedoresRepository.save).toHaveBeenCalledWith(
+      expect.objectContaining({ sessionVersion: 3 }),
+    );
   });
 
   it('restablece la contraseña, revoca sesiones y obliga a cambiarla', async () => {

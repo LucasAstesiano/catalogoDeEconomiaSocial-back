@@ -10,14 +10,17 @@ import {
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
+import type { GetObjectCommandOutput } from '@aws-sdk/client-s3';
 import { randomUUID } from 'crypto';
 import { extname } from 'path';
+import { Readable, Transform } from 'node:stream';
 import { resolveEnvironment } from '../../config/environment';
 
 export type ImageFolder = 'productos' | 'vendedores';
 
 @Injectable()
 export class UploadsService {
+  private static readonly MAX_IMAGE_BYTES = 5 * 1024 * 1024;
   private static readonly MANUAL_IMAGE_KEY =
     /^(productos|vendedores)\/\d{4}-\d{2}-\d{2}\/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(jpg|jpeg|png|webp|gif)$/i;
   private static readonly IMPORTED_PRODUCT_IMAGE_KEY =
@@ -107,16 +110,12 @@ export class UploadsService {
     }
 
     const expectedContentType = this.validateImageKey(key);
-    let bytes: Uint8Array;
+    let object: GetObjectCommandOutput;
 
     try {
-      const object = await this.client.send(
+      object = await this.client.send(
         new GetObjectCommand({ Bucket: this.bucket, Key: key }),
       );
-      if (!object.Body) {
-        throw new Error('El objeto no tiene contenido.');
-      }
-      bytes = await object.Body.transformToByteArray();
     } catch (error) {
       this.logStorageError('get_object', error);
       throw new InternalServerErrorException(
@@ -124,14 +123,24 @@ export class UploadsService {
       );
     }
 
-    const detectedContentType = this.detectImageMime(Buffer.from(bytes));
-    if (!detectedContentType || detectedContentType !== expectedContentType) {
+    if (!object.Body || !(object.Body instanceof Readable)) {
       throw new BadRequestException(
         'El objeto solicitado no corresponde a una imagen valida.',
       );
     }
+    if (
+      typeof object.ContentLength === 'number' &&
+      object.ContentLength > UploadsService.MAX_IMAGE_BYTES
+    ) {
+      object.Body.destroy();
+      throw new BadRequestException('La imagen solicitada excede el limite.');
+    }
 
-    return { bytes, contentType: detectedContentType };
+    return {
+      stream: this.limitStream(object.Body),
+      // Nunca confiar en ContentType de S3: la clave validada determina el MIME.
+      contentType: expectedContentType,
+    };
   }
 
   validateImageKey(key: string) {
@@ -187,6 +196,21 @@ export class UploadsService {
       return 'image/webp';
     }
     return null;
+  }
+
+  private limitStream(source: Readable) {
+    let transferred = 0;
+    const limiter = new Transform({
+      transform(chunk: Buffer, _encoding, callback) {
+        transferred += chunk.length;
+        if (transferred > UploadsService.MAX_IMAGE_BYTES) {
+          callback(new Error('La imagen excede el limite permitido.'));
+          return;
+        }
+        callback(null, chunk);
+      },
+    });
+    return source.pipe(limiter);
   }
 
   private publicUrl(key: string) {

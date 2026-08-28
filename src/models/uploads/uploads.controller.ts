@@ -59,6 +59,6 @@ export class UploadsController {
       'X-Content-Type-Options': 'nosniff',
       'Cache-Control': 'public, max-age=31536000, immutable',
     });
-    return new StreamableFile(image.bytes);
+    return new StreamableFile(image.stream);
   }
 }

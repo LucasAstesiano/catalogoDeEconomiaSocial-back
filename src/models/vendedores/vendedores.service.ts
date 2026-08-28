@@ -136,6 +136,7 @@ export class VendedoresService {
 
   async findAll(page = 1, pageSize = 50, includePrivate = false) {
     const vendedores = await this.vendedoresRepository.find({
+      where: includePrivate ? undefined : { estadoSolicitud: 'aprobado' },
       order: { id: 'ASC' },
       skip: (page - 1) * pageSize,
       take: pageSize,
@@ -146,13 +147,25 @@ export class VendedoresService {
   }
 
   async findOne(id: number, includePrivate = false) {
-    const vendedor = await this.vendedoresRepository.findOne({ where: { id } });
+    const vendedor = await this.vendedoresRepository.findOne({
+      where: includePrivate ? { id } : { id, estadoSolicitud: 'aprobado' },
+    });
     if (!vendedor) {
       throw new NotFoundException('Usuario no encontrado');
     }
     return includePrivate
       ? this.sanitize(vendedor)
       : this.sanitizePublic(vendedor);
+  }
+
+  async revokeSessions(id: number) {
+    const vendedor = await this.vendedoresRepository.findOne({ where: { id } });
+    if (!vendedor) {
+      throw new NotFoundException('Usuario no encontrado');
+    }
+
+    vendedor.sessionVersion = (vendedor.sessionVersion ?? 0) + 1;
+    await this.vendedoresRepository.save(vendedor);
   }
 
   async update(id: number, updateVendedoreDto: UpdateVendedoreDto) {

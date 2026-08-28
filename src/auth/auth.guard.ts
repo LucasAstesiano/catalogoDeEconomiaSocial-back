@@ -90,7 +90,7 @@ export class AuthGuard implements CanActivate {
       };
       const requestPath = (request.originalUrl ?? request.path).split('?')[0];
       const isPasswordChangeFlow =
-        /^\/(?:api\/v1\/)?vendedores\/(?:session|(?:me|\d+)\/password)$/.test(
+        /^\/(?:api\/v1\/)?vendedores\/(?:session|logout|(?:me|\d+)\/password)$/.test(
           requestPath,
         );
       if (request.user.passwordChangeRequired && !isPasswordChangeFlow) {

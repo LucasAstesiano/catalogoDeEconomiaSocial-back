@@ -62,8 +62,11 @@ export class VendedoresController {
   }
 
   @Post('logout')
-  @Public()
-  logout(@Res({ passthrough: true }) response: Response) {
+  async logout(
+    @CurrentUser() user: AuthenticatedUser,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    await this.vendedoresService.revokeSessions(user.sub);
     response.clearCookie(AUTH_COOKIE_NAME, {
       httpOnly: true,
       secure: true,

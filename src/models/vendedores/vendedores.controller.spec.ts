@@ -6,14 +6,18 @@ import { ROLES_KEY } from '../../auth/roles.decorator';
 
 describe('VendedoresController', () => {
   let controller: VendedoresController;
+  const vendedoresService = {
+    revokeSessions: jest.fn(),
+  };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [VendedoresController],
-      providers: [{ provide: VendedoresService, useValue: {} }],
+      providers: [{ provide: VendedoresService, useValue: vendedoresService }],
     }).compile();
 
     controller = module.get<VendedoresController>(VendedoresController);
+    jest.clearAllMocks();
   });
 
   it('should be defined', () => {
@@ -39,4 +43,25 @@ describe('VendedoresController', () => {
       ]);
     },
   );
+
+  it('revoca la sesion antes de borrar la cookie al cerrar sesion', async () => {
+    const response = { clearCookie: jest.fn() };
+    vendedoresService.revokeSessions.mockResolvedValue(undefined);
+
+    await expect(
+      controller.logout(
+        {
+          sub: 7,
+          email: 'usuario@ejemplo.com',
+          nombre: 'Usuario',
+          rol: 'usuario',
+          sessionVersion: 2,
+        },
+        response as never,
+      ),
+    ).resolves.toEqual({ message: 'Sesion cerrada' });
+
+    expect(vendedoresService.revokeSessions).toHaveBeenCalledWith(7);
+    expect(response.clearCookie).toHaveBeenCalled();
+  });
 });

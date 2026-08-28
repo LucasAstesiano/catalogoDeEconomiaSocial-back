@@ -1,4 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
+import { Readable } from 'node:stream';
 import { UploadsService } from './uploads.service';
 
 describe('UploadsService', () => {
@@ -67,15 +68,34 @@ describe('UploadsService', () => {
     expect(() => service.validateImageKey(key)).toThrow(BadRequestException);
   });
 
-  it('rechaza un objeto cuyo contenido no coincide con la extension validada', async () => {
+  it('transmite la imagen sin cargar el objeto completo en memoria', async () => {
     const service = new UploadsService();
-    const pngBytes = Buffer.from('89504e470d0a1a0a0000000d49484452', 'hex');
+    const body = Readable.from(Buffer.from('imagen'));
     const storageClient = (
       service as unknown as { client: { send: jest.Mock } }
     ).client;
     storageClient.send = jest.fn().mockResolvedValue({
-      Body: { transformToByteArray: jest.fn().mockResolvedValue(pngBytes) },
+      Body: body,
+      ContentLength: 6,
       ContentType: 'text/html',
+    });
+
+    const image = await service.getImage(
+      'productos/2026-08-25/123e4567-e89b-42d3-a456-426614174000.jpg',
+    );
+
+    expect(image.stream).toBeInstanceOf(Readable);
+    expect(image.contentType).toBe('image/jpeg');
+  });
+
+  it('rechaza objetos que exceden el limite antes de transmitirlos', async () => {
+    const service = new UploadsService();
+    const storageClient = (
+      service as unknown as { client: { send: jest.Mock } }
+    ).client;
+    storageClient.send = jest.fn().mockResolvedValue({
+      Body: Readable.from(Buffer.from('imagen')),
+      ContentLength: 5 * 1024 * 1024 + 1,
     });
 
     await expect(

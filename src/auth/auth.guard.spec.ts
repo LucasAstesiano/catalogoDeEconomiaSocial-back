@@ -120,6 +120,27 @@ describe('AuthGuard revocacion de sesiones', () => {
     await expect(guard.canActivate(context)).resolves.toBe(true);
   });
 
+  it('permite cerrar y revocar una sesión con cambio obligatorio', async () => {
+    request.method = 'POST';
+    request.originalUrl = '/api/v1/vendedores/logout';
+    request.path = '/api/v1/vendedores/logout';
+    jwtService.verifyAsync.mockResolvedValue({
+      sub: 4,
+      sessionVersion: 3,
+      passwordChangeRequired: true,
+    });
+    vendedoresRepository.findOne.mockResolvedValue({
+      id: 4,
+      email: 'legacy@ejemplo.com',
+      nombre: 'Legacy',
+      rol: 'usuario',
+      sessionVersion: 3,
+      estadoSolicitud: 'aprobado',
+    });
+
+    await expect(guard.canActivate(context)).resolves.toBe(true);
+  });
+
   it('conserva el error especifico cuando el usuario legacy accede a otra ruta', async () => {
     request.originalUrl = '/api/v1/productos';
     request.path = '/api/v1/productos';
