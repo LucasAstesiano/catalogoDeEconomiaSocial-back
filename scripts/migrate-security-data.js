@@ -66,8 +66,8 @@ async function main() {
         const { password, ...safePayload } = row.payload;
         safePayload.passwordHash = await argon2.hash(String(password ?? ''), {
           type: argon2.argon2id,
-          memoryCost: 19_456,
-          timeCost: 2,
+          memoryCost: 65_536,
+          timeCost: 3,
           parallelism: 1,
         });
         await database.query(

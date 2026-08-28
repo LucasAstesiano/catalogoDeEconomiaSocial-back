@@ -157,4 +157,38 @@ describe('SolicitudesService respuestas seguras', () => {
     expect(JSON.stringify(result)).not.toMatch(/password|secret|hash/i);
     expect(stored.payload).toHaveProperty('passwordHash');
   });
+
+  it('reemplaza cualquier vendedorId del cliente por el sub del JWT', async () => {
+    solicitudesRepository.save.mockImplementation((value: Solicitud) =>
+      Promise.resolve({ ...value, id: 12 }),
+    );
+
+    await service.create(
+      {
+        tipo: 'nuevo_producto',
+        payload: {
+          vendedorId: 999,
+          nombre: 'Producto seguro',
+          descripcion: 'Descripcion segura',
+          categoria: 'Artesanias',
+        },
+      } as never,
+      {
+        sub: 7,
+        email: 'vendedor@ejemplo.com',
+        nombre: 'Vendedor',
+        rol: 'usuario',
+        sessionVersion: 0,
+      },
+    );
+
+    expect(solicitudesRepository.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        solicitanteId: 7,
+        // Jest construye este matcher dinamicamente y su tipo publico es `any`.
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        payload: expect.objectContaining({ vendedorId: 7 }),
+      }),
+    );
+  });
 });

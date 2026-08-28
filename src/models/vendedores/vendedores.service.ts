@@ -17,7 +17,7 @@ import { Vendedor } from './entities/vendedore.entity';
 @Injectable()
 export class VendedoresService {
   private static readonly DUMMY_PASSWORD_HASH =
-    '$argon2id$v=19$m=19456,p=1,t=2$dcMoRC7NnjHhrW2aApdotA$eKdWPt2/fzmexACEEvwCKZ4/OPnwWdXujSHrWleg9d4';
+    '$argon2id$v=19$m=65536,p=1,t=3$I6AuZQ2Sm3+HCUZW+UQe6w$u5EhQsZPLV0McSJpWtsCJbao46OHQonWb0v+Z/x4yZ8';
 
   constructor(
     @InjectRepository(Vendedor)

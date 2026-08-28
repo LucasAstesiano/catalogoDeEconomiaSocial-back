@@ -21,6 +21,7 @@ import type {
   SolicitudPayload,
   VendorUpdatePayload,
 } from './solicitud-payload.types';
+import { assertAllowedImageUrls } from '../../security/image-url';
 
 export type PublicRegistrationResponse = Pick<
   Solicitud,
@@ -99,6 +100,16 @@ export class SolicitudesService {
     let payloadForStorage: SolicitudPayload = {
       ...createSolicitudDto.payload,
     } as SolicitudPayload;
+    if (
+      requester &&
+      (createSolicitudDto.tipo === 'actualizacion_datos' ||
+        createSolicitudDto.tipo === 'nuevo_producto')
+    ) {
+      payloadForStorage = {
+        ...payloadForStorage,
+        vendedorId: requester.sub,
+      };
+    }
     if (createSolicitudDto.tipo === 'registro_usuario') {
       const { password, ...safePayload } = createSolicitudDto.payload;
       payloadForStorage = {
@@ -106,6 +117,7 @@ export class SolicitudesService {
         passwordHash: await this.passwordService.hash(String(password ?? '')),
       };
     }
+    this.assertPayloadImageUrls(payloadForStorage);
 
     const solicitud = this.solicitudesRepository.create({
       tipo: createSolicitudDto.tipo,
@@ -280,6 +292,7 @@ export class SolicitudesService {
       }
       case 'nuevo_producto': {
         const payload = solicitud.payload as NewProductPayload;
+        this.assertPayloadImageUrls(payload);
         const vendedorId = Number(payload.vendedorId);
         const vendedor = await vendedores.findOne({
           where: { id: vendedorId },
@@ -307,6 +320,7 @@ export class SolicitudesService {
       }
       case 'actualizacion_producto': {
         const payload = solicitud.payload as ProductUpdatePayload;
+        this.assertPayloadImageUrls(payload);
         const productoId = Number(payload.productoId);
         const producto = await productos.findOne({ where: { id: productoId } });
         if (!producto) {
@@ -363,11 +377,6 @@ export class SolicitudesService {
     if (requester.rol === 'administrador') return;
     const payload = dto.payload;
     if (dto.tipo === 'actualizacion_datos' || dto.tipo === 'nuevo_producto') {
-      if (Number(payload.vendedorId) !== requester.sub) {
-        throw new ForbiddenException(
-          'No podes solicitar cambios para otro usuario',
-        );
-      }
       return;
     }
     if (dto.tipo === 'actualizacion_producto') {
@@ -382,13 +391,6 @@ export class SolicitudesService {
 
   private validateAuthenticatedPayload(dto: CreateSolicitudDto) {
     const payload = dto.payload;
-    if (
-      (dto.tipo === 'actualizacion_datos' || dto.tipo === 'nuevo_producto') &&
-      !payload.vendedorId
-    ) {
-      throw new BadRequestException('El vendedorId es obligatorio');
-    }
-
     if (dto.tipo === 'nuevo_producto') {
       if (!payload.nombre || !payload.descripcion || !payload.categoria) {
         throw new BadRequestException(
@@ -400,5 +402,15 @@ export class SolicitudesService {
     if (dto.tipo === 'actualizacion_producto' && !payload.productoId) {
       throw new BadRequestException('El productoId es obligatorio');
     }
+  }
+
+  private assertPayloadImageUrls(payload: SolicitudPayload) {
+    const candidate = payload as Partial<NewProductPayload>;
+    assertAllowedImageUrls([
+      candidate.imagenUrl,
+      candidate.imagenUrl2,
+      candidate.imagenUrl3,
+      candidate.imagenUrl4,
+    ]);
   }
 }

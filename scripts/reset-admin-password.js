@@ -23,8 +23,8 @@ async function main() {
   const temporaryPassword = `${randomBytes(18).toString('base64url')}aA1!`;
   const passwordHash = await argon2.hash(temporaryPassword, {
     type: argon2.argon2id,
-    memoryCost: 19_456,
-    timeCost: 2,
+    memoryCost: 65_536,
+    timeCost: 3,
     parallelism: 1,
   });
   const client = new Client({

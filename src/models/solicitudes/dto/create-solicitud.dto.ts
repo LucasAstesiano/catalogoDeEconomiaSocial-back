@@ -19,11 +19,6 @@ export class SolicitudPayloadDto {
   @IsOptional()
   @IsInt()
   @Min(1)
-  vendedorId?: number;
-
-  @IsOptional()
-  @IsInt()
-  @Min(1)
   productoId?: number;
 
   @IsOptional()

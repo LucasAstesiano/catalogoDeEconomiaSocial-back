@@ -1,7 +1,6 @@
 import {
   IsArray,
   IsEmail,
-  IsIn,
   IsOptional,
   IsString,
   IsUrl,
@@ -21,9 +20,6 @@ export class CreateVendedoreDto {
   @MinLength(12)
   @MaxLength(128)
   password: string;
-  @IsOptional()
-  @IsIn(['usuario', 'administrador'])
-  rol?: 'usuario' | 'administrador';
   @IsOptional()
   @IsString()
   @MaxLength(30)

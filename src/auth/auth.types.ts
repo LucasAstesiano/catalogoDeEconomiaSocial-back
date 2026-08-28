@@ -9,5 +9,5 @@ export type AuthenticatedUser = {
 
 export type AuthenticatedRequest = Request & { user: AuthenticatedUser };
 
-export const AUTH_COOKIE_NAME = 'catalogo_session';
+export const AUTH_COOKIE_NAME = '__Host-catalogo_session';
 import type { Request } from 'express';

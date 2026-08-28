@@ -18,6 +18,26 @@ describe('validateEnvironment', () => {
     expect(validateEnvironment({ DB_PASSWORD: 'segura' })).toBeDefined();
   });
 
+  it('exige un JWT_SECRET de al menos 64 caracteres en produccion', () => {
+    expect(() =>
+      validateEnvironment({
+        NODE_ENV: 'production',
+        DB_PASSWORD: 'segura',
+        JWT_SECRET: 'x'.repeat(63),
+        FRONTEND_URL: 'https://catalogo.example',
+      }),
+    ).toThrow('64 caracteres');
+
+    expect(() =>
+      validateEnvironment({
+        NODE_ENV: 'production',
+        DB_PASSWORD: 'segura',
+        JWT_SECRET: 'x'.repeat(64),
+        FRONTEND_URL: 'https://catalogo.example',
+      }),
+    ).not.toThrow();
+  });
+
   it('resuelve secretos desde archivos montados', () => {
     const directory = mkdtempSync(join(tmpdir(), 'catalogo-secrets-'));
     const passwordFile = join(directory, 'db_password');

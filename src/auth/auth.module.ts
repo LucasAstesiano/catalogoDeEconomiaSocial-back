@@ -14,13 +14,22 @@ import { Vendedor } from '../models/vendedores/entities/vendedore.entity';
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
         const secret = config.get<string>('JWT_SECRET');
-        if (!secret || secret.length < 32) {
-          throw new Error('JWT_SECRET debe tener al menos 32 caracteres');
+        if (!secret || secret.length < 64) {
+          throw new Error('JWT_SECRET debe tener al menos 64 caracteres');
         }
         return {
           secret,
-          signOptions: { expiresIn: '30m', issuer: 'catalogo-economia-social' },
-          verifyOptions: { issuer: 'catalogo-economia-social' },
+          signOptions: {
+            expiresIn: '30m',
+            issuer: 'catalogo-economia-social',
+            audience: 'catalogo-web',
+            algorithm: 'HS256',
+          },
+          verifyOptions: {
+            issuer: 'catalogo-economia-social',
+            audience: 'catalogo-web',
+            algorithms: ['HS256'],
+          },
         };
       },
     }),

@@ -15,6 +15,8 @@ import { UpdateProductoDto } from './dto/update-producto.dto';
 import { Public } from '../../auth/public.decorator';
 import { Roles } from '../../auth/roles.decorator';
 import { ProductosQueryDto } from './dto/productos-query.dto';
+import { CurrentUser } from '../../auth/current-user.decorator';
+import type { AuthenticatedUser } from '../../auth/auth.types';
 
 @Controller('productos')
 export class ProductosController {
@@ -34,6 +36,11 @@ export class ProductosController {
       query.page,
       query.pageSize,
     );
+  }
+
+  @Get('mios')
+  findMine(@CurrentUser() user: AuthenticatedUser) {
+    return this.productosService.findAll(user.sub);
   }
 
   @Get(':id')

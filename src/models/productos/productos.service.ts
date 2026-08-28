@@ -9,6 +9,7 @@ import { CreateProductoDto } from './dto/create-producto.dto';
 import { UpdateProductoDto } from './dto/update-producto.dto';
 import { Producto } from './entities/producto.entity';
 import { Vendedor } from '../vendedores/entities/vendedore.entity';
+import { assertAllowedImageUrls } from '../../security/image-url';
 
 const normalizarBooleano = (valor: unknown): boolean => {
   if (typeof valor === 'boolean') return valor;
@@ -32,6 +33,12 @@ export class ProductosService {
   ) {}
 
   async create(createProductoDto: CreateProductoDto) {
+    assertAllowedImageUrls([
+      createProductoDto.imagenUrl,
+      createProductoDto.imagenUrl2,
+      createProductoDto.imagenUrl3,
+      createProductoDto.imagenUrl4,
+    ]);
     if (!createProductoDto.vendedorId) {
       throw new BadRequestException(
         'El producto debe estar asignado a un usuario',
@@ -86,6 +93,12 @@ export class ProductosService {
   }
 
   async update(id: number, updateProductoDto: UpdateProductoDto) {
+    assertAllowedImageUrls([
+      updateProductoDto.imagenUrl,
+      updateProductoDto.imagenUrl2,
+      updateProductoDto.imagenUrl3,
+      updateProductoDto.imagenUrl4,
+    ]);
     const producto = await this.findOne(id);
 
     if (updateProductoDto.vendedorId !== undefined) {

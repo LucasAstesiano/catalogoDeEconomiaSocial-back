@@ -42,8 +42,8 @@ export function validateEnvironment(env: Environment) {
 
   if (resolved.NODE_ENV === 'production') {
     const jwtSecret = required(resolved, 'JWT_SECRET');
-    if (jwtSecret.length < 32) {
-      throw new Error('JWT_SECRET debe tener al menos 32 caracteres');
+    if (jwtSecret.length < 64) {
+      throw new Error('JWT_SECRET debe tener al menos 64 caracteres');
     }
     required(resolved, 'FRONTEND_URL');
   }

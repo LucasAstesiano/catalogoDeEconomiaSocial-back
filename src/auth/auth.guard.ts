@@ -62,6 +62,14 @@ export class AuthGuard implements CanActivate {
     try {
       const claims =
         await this.jwtService.verifyAsync<AuthenticatedUser>(token);
+      if (
+        !Number.isInteger(claims.sub) ||
+        claims.sub < 1 ||
+        !Number.isInteger(claims.sessionVersion) ||
+        claims.sessionVersion < 0
+      ) {
+        throw new UnauthorizedException('Token sin identidad valida');
+      }
       const vendedor = await this.vendedoresRepository.findOne({
         where: { id: claims.sub },
       });
@@ -73,14 +81,16 @@ export class AuthGuard implements CanActivate {
         throw new UnauthorizedException('Sesion revocada');
       }
       request.user = {
-        ...claims,
+        sub: vendedor.id,
         email: vendedor.email,
         nombre: vendedor.nombre,
         rol: vendedor.rol,
+        sessionVersion: vendedor.sessionVersion,
+        passwordChangeRequired: Boolean(claims.passwordChangeRequired),
       };
       const requestPath = (request.originalUrl ?? request.path).split('?')[0];
       const isPasswordChangeFlow =
-        /^\/(?:api\/v1\/)?vendedores\/(?:session|\d+\/password)$/.test(
+        /^\/(?:api\/v1\/)?vendedores\/(?:session|(?:me|\d+)\/password)$/.test(
           requestPath,
         );
       if (request.user.passwordChangeRequired && !isPasswordChangeFlow) {

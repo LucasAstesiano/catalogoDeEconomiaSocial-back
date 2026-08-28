@@ -11,7 +11,7 @@ describe('AuthGuard revocacion de sesiones', () => {
   const reflector = { getAllAndOverride: jest.fn().mockReturnValue(false) };
   const vendedoresRepository = { findOne: jest.fn() };
   const request = {
-    headers: { cookie: 'catalogo_session=token' },
+    headers: { cookie: '__Host-catalogo_session=token' },
     method: 'GET',
     originalUrl: '/api/v1/vendedores/session',
     path: '/vendedores/session',
@@ -47,6 +47,15 @@ describe('AuthGuard revocacion de sesiones', () => {
     await expect(guard.canActivate(context)).rejects.toBeInstanceOf(
       UnauthorizedException,
     );
+  });
+
+  it('rechaza claims sin sub valido antes de consultar la base', async () => {
+    jwtService.verifyAsync.mockResolvedValue({ sessionVersion: 0 });
+
+    await expect(guard.canActivate(context)).rejects.toBeInstanceOf(
+      UnauthorizedException,
+    );
+    expect(vendedoresRepository.findOne).not.toHaveBeenCalled();
   });
 
   it('usa el rol actual almacenado y no el rol antiguo del token', async () => {

@@ -53,10 +53,10 @@ export class VendedoresController {
       await this.vendedoresService.login(loginDto);
     response.cookie(AUTH_COOKIE_NAME, accessToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      secure: true,
+      sameSite: 'strict',
       maxAge: 30 * 60 * 1000,
-      path: '/api/v1',
+      path: '/',
     });
     return result;
   }
@@ -66,9 +66,9 @@ export class VendedoresController {
   logout(@Res({ passthrough: true }) response: Response) {
     response.clearCookie(AUTH_COOKIE_NAME, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path: '/api/v1',
+      secure: true,
+      sameSite: 'strict',
+      path: '/',
     });
     return { message: 'Sesion cerrada' };
   }
@@ -97,6 +97,23 @@ export class VendedoresController {
   @Roles('administrador')
   findAllAdmin(@Query() query: PaginationQueryDto) {
     return this.vendedoresService.findAll(query.page, query.pageSize, true);
+  }
+
+  @Get('me/perfil')
+  findMyPrivateProfile(@CurrentUser() user: AuthenticatedUser) {
+    return this.vendedoresService.findOne(user.sub, true);
+  }
+
+  @Patch('me/password')
+  changeMyPassword(
+    @Body() changePasswordDto: ChangePasswordVendedoreDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.vendedoresService.changePassword(
+      user.sub,
+      String(changePasswordDto.currentPassword ?? ''),
+      String(changePasswordDto.newPassword ?? ''),
+    );
   }
 
   @Get(':id/perfil')
