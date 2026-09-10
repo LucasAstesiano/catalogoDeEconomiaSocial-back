@@ -5,6 +5,8 @@ type Environment = Record<string, string | undefined>;
 const FILE_BACKED_SECRETS = [
   'DB_PASSWORD',
   'JWT_SECRET',
+  'MFA_SECRET',
+  'SMTP_PASSWORD',
   'S3_ACCESS_KEY_ID',
   'S3_SECRET_ACCESS_KEY',
 ] as const;
@@ -46,6 +48,32 @@ export function validateEnvironment(env: Environment) {
       throw new Error('JWT_SECRET debe tener al menos 64 caracteres');
     }
     required(resolved, 'FRONTEND_URL');
+  }
+
+  const mfaEnabled = resolved.ADMIN_EMAIL_MFA_ENABLED === 'true';
+  if (
+    resolved.ADMIN_EMAIL_MFA_ENABLED &&
+    !['true', 'false'].includes(resolved.ADMIN_EMAIL_MFA_ENABLED)
+  ) {
+    throw new Error('ADMIN_EMAIL_MFA_ENABLED debe ser true o false');
+  }
+  if (resolved.NODE_ENV === 'production' && !mfaEnabled) {
+    throw new Error('ADMIN_EMAIL_MFA_ENABLED debe estar activo en producción');
+  }
+  if (mfaEnabled) {
+    const mfaSecret = required(resolved, 'MFA_SECRET');
+    if (mfaSecret.length < 64) {
+      throw new Error('MFA_SECRET debe tener al menos 64 caracteres');
+    }
+    required(resolved, 'SMTP_HOST');
+    required(resolved, 'SMTP_FROM');
+    const smtpPort = Number(resolved.SMTP_PORT ?? 587);
+    if (!Number.isInteger(smtpPort) || smtpPort < 1 || smtpPort > 65535) {
+      throw new Error('SMTP_PORT debe ser un puerto valido');
+    }
+    if (Boolean(resolved.SMTP_USER) !== Boolean(resolved.SMTP_PASSWORD)) {
+      throw new Error('SMTP_USER y SMTP_PASSWORD deben configurarse juntos');
+    }
   }
 
   const s3Values = [

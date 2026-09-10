@@ -4,6 +4,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { Vendedor } from './entities/vendedore.entity';
 import { PasswordService } from '../../auth/password.service';
 import { JwtService } from '@nestjs/jwt';
+import { AdminMfaService } from '../../auth/admin-mfa.service';
 
 describe('VendedoresService', () => {
   let service: VendedoresService;
@@ -18,6 +19,12 @@ describe('VendedoresService', () => {
     hash: jest.fn(),
     verify: jest.fn(),
   };
+  const jwtService = { signAsync: jest.fn() };
+  const adminMfaService = {
+    isEnabled: jest.fn(),
+    createChallenge: jest.fn(),
+    verifyChallenge: jest.fn(),
+  };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -28,12 +35,15 @@ describe('VendedoresService', () => {
           useValue: vendedoresRepository,
         },
         { provide: PasswordService, useValue: passwordService },
-        { provide: JwtService, useValue: {} },
+        { provide: JwtService, useValue: jwtService },
+        { provide: AdminMfaService, useValue: adminMfaService },
       ],
     }).compile();
 
     service = module.get<VendedoresService>(VendedoresService);
     jest.clearAllMocks();
+    adminMfaService.isEnabled.mockReturnValue(false);
+    jwtService.signAsync.mockResolvedValue('jwt-firmado');
   });
 
   it('should be defined', () => {
@@ -147,6 +157,40 @@ describe('VendedoresService', () => {
     ).rejects.toThrow('La contraseña temporal venció');
   });
 
+  it('obliga a cambiar la contraseña predeterminada 1234', async () => {
+    const vendedor = {
+      id: 7,
+      email: 'usuario@ejemplo.com',
+      nombre: 'Usuario',
+      rol: 'usuario',
+      estadoSolicitud: 'aprobado',
+      passwordHash: 'hash-real',
+      passwordChangeRequired: false,
+      temporaryPasswordExpiresAt: null,
+      sessionVersion: 0,
+    };
+    vendedoresRepository.findOne.mockResolvedValue(vendedor);
+    vendedoresRepository.save.mockResolvedValue(vendedor);
+    passwordService.verify.mockResolvedValue({ valid: true, legacy: false });
+
+    const result = await service.login({
+      email: 'usuario@ejemplo.com',
+      password: '1234',
+    });
+
+    expect(vendedoresRepository.save).toHaveBeenCalledWith(
+      expect.objectContaining({ passwordChangeRequired: true }),
+    );
+    expect(result).toEqual(
+      expect.objectContaining({
+        user: expect.objectContaining({ passwordChangeRequired: true }),
+      }),
+    );
+    expect(jwtService.signAsync).toHaveBeenCalledWith(
+      expect.objectContaining({ passwordChangeRequired: true }),
+    );
+  });
+
   it('verifica un hash dummy cuando el email no existe', async () => {
     vendedoresRepository.findOne.mockResolvedValue(null);
     passwordService.verify.mockResolvedValue({ valid: false, legacy: false });
@@ -196,6 +240,60 @@ describe('VendedoresService', () => {
         password: 'Password-Correcta-2026',
       }),
     ).rejects.toThrow('Tu cuenta esta pendiente de aprobacion');
+  });
+
+  it('no emite una sesión administradora antes de validar el código', async () => {
+    const admin = {
+      id: 1,
+      nombre: 'Admin',
+      email: 'admin@institucion.gob.ar',
+      rol: 'administrador',
+      estadoSolicitud: 'aprobado',
+      passwordHash: 'hash-real',
+      passwordChangeRequired: false,
+      temporaryPasswordExpiresAt: null,
+    };
+    vendedoresRepository.findOne.mockResolvedValue(admin);
+    passwordService.verify.mockResolvedValue({ valid: true, legacy: false });
+    adminMfaService.isEnabled.mockReturnValue(true);
+    adminMfaService.createChallenge.mockResolvedValue({
+      challengeId: 'c336f849-f5c4-4f9d-8f25-fc01629f1a01',
+      emailMasked: 'ad***@institucion.gob.ar',
+      expiresInSeconds: 300,
+    });
+
+    await expect(
+      service.login({
+        email: admin.email,
+        password: 'Password-Correcta-2026',
+      }),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        mfaRequired: true,
+        challengeId: 'c336f849-f5c4-4f9d-8f25-fc01629f1a01',
+      }),
+    );
+    expect(jwtService.signAsync).not.toHaveBeenCalled();
+  });
+
+  it('emite la sesión administradora después de consumir el desafío', async () => {
+    const admin = {
+      id: 1,
+      nombre: 'Admin',
+      email: 'admin@institucion.gob.ar',
+      rol: 'administrador',
+      estadoSolicitud: 'aprobado',
+      passwordChangeRequired: false,
+      sessionVersion: 3,
+    };
+    adminMfaService.verifyChallenge.mockResolvedValue(admin);
+
+    await expect(
+      service.verifyAdminMfa('c336f849-f5c4-4f9d-8f25-fc01629f1a01', '123456'),
+    ).resolves.toEqual(expect.objectContaining({ accessToken: 'jwt-firmado' }));
+    expect(jwtService.signAsync).toHaveBeenCalledWith(
+      expect.objectContaining({ sub: 1, rol: 'administrador' }),
+    );
   });
 
   it('impide que un administrador elimine su propia cuenta', async () => {

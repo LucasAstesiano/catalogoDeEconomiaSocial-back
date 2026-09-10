@@ -57,6 +57,7 @@ export class UploadsController {
       'Content-Type': image.contentType,
       'Content-Disposition': 'inline',
       'X-Content-Type-Options': 'nosniff',
+      'Cross-Origin-Resource-Policy': 'cross-origin',
       'Cache-Control': 'public, max-age=31536000, immutable',
     });
     return new StreamableFile(image.stream);

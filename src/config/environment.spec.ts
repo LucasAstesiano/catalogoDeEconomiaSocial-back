@@ -34,8 +34,24 @@ describe('validateEnvironment', () => {
         DB_PASSWORD: 'segura',
         JWT_SECRET: 'x'.repeat(64),
         FRONTEND_URL: 'https://catalogo.example',
+        ADMIN_EMAIL_MFA_ENABLED: 'true',
+        MFA_SECRET: 'm'.repeat(64),
+        SMTP_HOST: 'correo.institucion.gob.ar',
+        SMTP_FROM: 'no-responder@institucion.gob.ar',
       }),
     ).not.toThrow();
+  });
+
+  it('exige MFA por correo en produccion', () => {
+    expect(() =>
+      validateEnvironment({
+        NODE_ENV: 'production',
+        DB_PASSWORD: 'segura',
+        JWT_SECRET: 'x'.repeat(64),
+        FRONTEND_URL: 'https://catalogo.example',
+        ADMIN_EMAIL_MFA_ENABLED: 'false',
+      }),
+    ).toThrow('debe estar activo');
   });
 
   it('resuelve secretos desde archivos montados', () => {

@@ -4,12 +4,13 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { CreateProductoDto } from './dto/create-producto.dto';
 import { UpdateProductoDto } from './dto/update-producto.dto';
 import { Producto } from './entities/producto.entity';
 import { Vendedor } from '../vendedores/entities/vendedore.entity';
 import { assertAllowedImageUrls } from '../../security/image-url';
+import { CatalogoProductosQueryDto } from './dto/catalogo-productos-query.dto';
 
 const normalizarBooleano = (valor: unknown): boolean => {
   if (typeof valor === 'boolean') return valor;
@@ -82,6 +83,99 @@ export class ProductosService {
       order: { id: 'DESC' },
       ...pagination,
     });
+  }
+
+  async findCatalog(query: CatalogoProductosQueryDto) {
+    const builder = this.productosRepository
+      .createQueryBuilder('producto')
+      .orderBy('producto.id', 'DESC')
+      .skip((query.page - 1) * query.pageSize)
+      .take(query.pageSize);
+
+    if (query.categoria) {
+      builder.andWhere('producto.categoria = :categoria', {
+        categoria: query.categoria,
+      });
+    }
+    if (query.subcategoria) {
+      builder.andWhere('producto.subcategoria = :subcategoria', {
+        subcategoria: query.subcategoria,
+      });
+    }
+    if (query.busqueda) {
+      builder.andWhere(
+        '(producto.nombre ILIKE :busqueda OR producto.descripcion ILIKE :busqueda)',
+        { busqueda: `%${query.busqueda}%` },
+      );
+    }
+
+    const [productos, total] = await builder.getManyAndCount();
+    const items = await this.withSellerNames(productos);
+
+    return {
+      items,
+      total,
+      page: query.page,
+      pageSize: query.pageSize,
+      totalPages: Math.max(1, Math.ceil(total / query.pageSize)),
+    };
+  }
+
+  async findFeatured(limit: number) {
+    const productos = await this.productosRepository.find({
+      where: { destacado: true },
+      order: { id: 'DESC' },
+      take: limit,
+    });
+    return this.withSellerNames(productos);
+  }
+
+  async findCatalogFilters() {
+    const rows = await this.productosRepository
+      .createQueryBuilder('producto')
+      .select('producto.categoria', 'categoria')
+      .addSelect('producto.subcategoria', 'subcategoria')
+      .where("producto.categoria <> ''")
+      .groupBy('producto.categoria')
+      .addGroupBy('producto.subcategoria')
+      .orderBy('producto.categoria', 'ASC')
+      .addOrderBy('producto.subcategoria', 'ASC')
+      .getRawMany<{ categoria: string; subcategoria: string | null }>();
+
+    const categorias = [...new Set(rows.map(({ categoria }) => categoria))];
+    const subcategoriasPorCategoria = Object.fromEntries(
+      categorias.map((categoria) => [
+        categoria,
+        rows
+          .filter((row) => row.categoria === categoria && row.subcategoria)
+          .map(({ subcategoria }) => subcategoria as string),
+      ]),
+    );
+
+    return {
+      categorias,
+      subcategoriasPorCategoria,
+    };
+  }
+
+  private async withSellerNames(productos: Producto[]) {
+    const sellerIds = [
+      ...new Set(productos.map(({ vendedorId }) => vendedorId).filter(Boolean)),
+    ];
+    if (sellerIds.length === 0) return [];
+
+    const vendedores = await this.vendedoresRepository.find({
+      select: { id: true, nombre: true },
+      where: { id: In(sellerIds) },
+    });
+    const sellerNames = new Map(
+      vendedores.map(({ id, nombre }) => [id, nombre]),
+    );
+
+    return productos.map((producto) => ({
+      ...producto,
+      vendedorNombre: sellerNames.get(producto.vendedorId) ?? null,
+    }));
   }
 
   async findOne(id: number) {

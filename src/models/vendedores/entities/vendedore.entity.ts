@@ -65,6 +65,23 @@ export class Vendedor {
   })
   temporaryPasswordExpiresAt: Date | null;
 
+  @Column({ name: 'admin_mfa_challenge_id', type: 'uuid', nullable: true })
+  adminMfaChallengeId: string | null;
+
+  @Column({
+    name: 'admin_mfa_code_hash',
+    type: 'varchar',
+    length: 64,
+    nullable: true,
+  })
+  adminMfaCodeHash: string | null;
+
+  @Column({ name: 'admin_mfa_expires_at', type: 'timestamptz', nullable: true })
+  adminMfaExpiresAt: Date | null;
+
+  @Column({ name: 'admin_mfa_attempts', type: 'smallint', default: 0 })
+  adminMfaAttempts: number;
+
   @OneToMany(() => Producto, (producto) => producto.vendedor)
   productos: Producto[];
 }

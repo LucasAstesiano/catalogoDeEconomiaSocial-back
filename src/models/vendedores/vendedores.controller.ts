@@ -29,6 +29,7 @@ import {
 } from '../../auth/auth.types';
 import { Throttle } from '@nestjs/throttler';
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
+import { VerifyAdminMfaDto } from './dto/verify-admin-mfa.dto';
 
 @Controller('vendedores')
 export class VendedoresController {
@@ -49,8 +50,28 @@ export class VendedoresController {
     @Body() loginDto: LoginVendedoreDto,
     @Res({ passthrough: true }) response: Response,
   ) {
+    const result = await this.vendedoresService.login(loginDto);
+    if (!('accessToken' in result)) return result;
+
+    const { accessToken, ...body } = result;
+    this.setAuthCookie(response, accessToken);
+    return body;
+  }
+
+  @Post('login/mfa')
+  @Public()
+  @Throttle({ default: { limit: 5, ttl: 300_000, blockDuration: 900_000 } })
+  async verifyAdminMfa(
+    @Body() dto: VerifyAdminMfaDto,
+    @Res({ passthrough: true }) response: Response,
+  ) {
     const { accessToken, ...result } =
-      await this.vendedoresService.login(loginDto);
+      await this.vendedoresService.verifyAdminMfa(dto.challengeId, dto.code);
+    this.setAuthCookie(response, accessToken);
+    return result;
+  }
+
+  private setAuthCookie(response: Response, accessToken: string) {
     response.cookie(AUTH_COOKIE_NAME, accessToken, {
       httpOnly: true,
       secure: true,
@@ -58,7 +79,6 @@ export class VendedoresController {
       maxAge: 30 * 60 * 1000,
       path: '/',
     });
-    return result;
   }
 
   @Post('logout')

@@ -15,6 +15,8 @@ import { UpdateProductoDto } from './dto/update-producto.dto';
 import { Public } from '../../auth/public.decorator';
 import { Roles } from '../../auth/roles.decorator';
 import { ProductosQueryDto } from './dto/productos-query.dto';
+import { CatalogoProductosQueryDto } from './dto/catalogo-productos-query.dto';
+import { DestacadosQueryDto } from './dto/destacados-query.dto';
 import { CurrentUser } from '../../auth/current-user.decorator';
 import type { AuthenticatedUser } from '../../auth/auth.types';
 
@@ -41,6 +43,24 @@ export class ProductosController {
   @Get('mios')
   findMine(@CurrentUser() user: AuthenticatedUser) {
     return this.productosService.findAll(user.sub);
+  }
+
+  @Get('catalogo')
+  @Public()
+  findCatalog(@Query() query: CatalogoProductosQueryDto) {
+    return this.productosService.findCatalog(query);
+  }
+
+  @Get('destacados')
+  @Public()
+  findFeatured(@Query() query: DestacadosQueryDto) {
+    return this.productosService.findFeatured(query.limit);
+  }
+
+  @Get('filtros')
+  @Public()
+  findCatalogFilters() {
+    return this.productosService.findCatalogFilters();
   }
 
   @Get(':id')

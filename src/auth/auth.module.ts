@@ -4,6 +4,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { PasswordService } from './password.service';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Vendedor } from '../models/vendedores/entities/vendedore.entity';
+import { AdminMfaService } from './admin-mfa.service';
 
 @Global()
 @Module({
@@ -34,7 +35,7 @@ import { Vendedor } from '../models/vendedores/entities/vendedore.entity';
       },
     }),
   ],
-  providers: [PasswordService],
-  exports: [JwtModule, PasswordService, TypeOrmModule],
+  providers: [PasswordService, AdminMfaService],
+  exports: [JwtModule, PasswordService, AdminMfaService, TypeOrmModule],
 })
 export class AuthModule {}

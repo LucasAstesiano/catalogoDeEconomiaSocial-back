@@ -13,6 +13,7 @@ import { CreateVendedoreDto } from './dto/create-vendedore.dto';
 import { UpdateVendedoreDto } from './dto/update-vendedore.dto';
 import { LoginVendedoreDto } from './dto/login-vendedore.dto';
 import { Vendedor } from './entities/vendedore.entity';
+import { AdminMfaService } from '../../auth/admin-mfa.service';
 
 @Injectable()
 export class VendedoresService {
@@ -24,6 +25,7 @@ export class VendedoresService {
     private readonly vendedoresRepository: Repository<Vendedor>,
     private readonly passwordService: PasswordService,
     private readonly jwtService: JwtService,
+    private readonly adminMfaService: AdminMfaService,
   ) {}
 
   private sanitize(vendedor: Vendedor) {
@@ -110,13 +112,53 @@ export class VendedoresService {
     }
     if (
       vendedor.passwordChangeRequired &&
-      (!vendedor.temporaryPasswordExpiresAt ||
-        vendedor.temporaryPasswordExpiresAt.getTime() <= Date.now())
+      vendedor.temporaryPasswordExpiresAt &&
+      vendedor.temporaryPasswordExpiresAt.getTime() <= Date.now()
     ) {
       throw new UnauthorizedException('La contraseña temporal venció');
     }
+    const usedDefaultPassword = password === '1234';
     const passwordChangeRequired =
-      verification.legacy || vendedor.passwordChangeRequired;
+      usedDefaultPassword ||
+      verification.legacy ||
+      vendedor.passwordChangeRequired;
+
+    if (usedDefaultPassword && !vendedor.passwordChangeRequired) {
+      vendedor.passwordChangeRequired = true;
+      vendedor.temporaryPasswordExpiresAt = null;
+      await this.vendedoresRepository.save(vendedor);
+    }
+
+    if (vendedor.rol === 'administrador' && this.adminMfaService.isEnabled()) {
+      const challenge = await this.adminMfaService.createChallenge(
+        vendedor,
+        passwordChangeRequired,
+      );
+      return {
+        message: 'Código de acceso enviado',
+        mfaRequired: true as const,
+        ...challenge,
+      };
+    }
+
+    return this.createAuthenticatedSession(vendedor, passwordChangeRequired);
+  }
+
+  async verifyAdminMfa(challengeId: string, code: string) {
+    const vendedor = await this.adminMfaService.verifyChallenge(
+      challengeId,
+      code,
+    );
+    return this.createAuthenticatedSession(
+      vendedor,
+      vendedor.passwordChangeRequired,
+    );
+  }
+
+  private async createAuthenticatedSession(
+    vendedor: Vendedor,
+    passwordChangeRequired: boolean,
+  ) {
     const user = { ...this.sanitize(vendedor), passwordChangeRequired };
     const accessToken = await this.jwtService.signAsync({
       sub: vendedor.id,
