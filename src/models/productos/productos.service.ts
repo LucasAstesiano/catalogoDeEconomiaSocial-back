@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { ILike, In, Repository } from 'typeorm';
 import { CreateProductoDto } from './dto/create-producto.dto';
 import { UpdateProductoDto } from './dto/update-producto.dto';
 import { Producto } from './entities/producto.entity';
@@ -69,8 +69,24 @@ export class ProductosService {
     return this.productosRepository.save(producto);
   }
 
-  findAll(vendedorId?: number, page = 1, pageSize = 50) {
+  findAll(vendedorId?: number, page = 1, pageSize = 50, busqueda?: string) {
     const pagination = { skip: (page - 1) * pageSize, take: pageSize };
+    const termino = busqueda?.trim();
+    if (termino) {
+      const patron = `%${termino}%`;
+      return this.productosRepository.find({
+        where: [
+          { ...(vendedorId ? { vendedorId } : {}), nombre: ILike(patron) },
+          { ...(vendedorId ? { vendedorId } : {}), categoria: ILike(patron) },
+          {
+            ...(vendedorId ? { vendedorId } : {}),
+            subcategoria: ILike(patron),
+          },
+        ],
+        order: { id: 'DESC' },
+        ...pagination,
+      });
+    }
     if (vendedorId) {
       return this.productosRepository.find({
         where: { vendedorId },

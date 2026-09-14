@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { JwtService } from '@nestjs/jwt';
-import { Repository } from 'typeorm';
+import { ILike, Repository } from 'typeorm';
 import { PasswordService } from '../../auth/password.service';
 import { CreateVendedoreDto } from './dto/create-vendedore.dto';
 import { UpdateVendedoreDto } from './dto/update-vendedore.dto';
@@ -176,9 +176,26 @@ export class VendedoresService {
     };
   }
 
-  async findAll(page = 1, pageSize = 50, includePrivate = false) {
+  async findAll(
+    page = 1,
+    pageSize = 50,
+    includePrivate = false,
+    busqueda?: string,
+  ) {
+    const termino = busqueda?.trim();
+    const patron = termino ? `%${termino}%` : undefined;
+    const where = patron
+      ? includePrivate
+        ? [{ nombre: ILike(patron) }, { email: ILike(patron) }]
+        : [
+            { estadoSolicitud: 'aprobado' as const, nombre: ILike(patron) },
+            { estadoSolicitud: 'aprobado' as const, email: ILike(patron) },
+          ]
+      : includePrivate
+        ? undefined
+        : { estadoSolicitud: 'aprobado' as const };
     const vendedores = await this.vendedoresRepository.find({
-      where: includePrivate ? undefined : { estadoSolicitud: 'aprobado' },
+      where,
       order: { id: 'ASC' },
       skip: (page - 1) * pageSize,
       take: pageSize,

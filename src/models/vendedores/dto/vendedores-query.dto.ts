@@ -1,9 +1,8 @@
-import { Type } from 'class-transformer';
-import { IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
 import { Transform } from 'class-transformer';
+import { IsOptional, IsString, MaxLength } from 'class-validator';
 import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
 
-export class ProductosQueryDto extends PaginationQueryDto {
+export class VendedoresQueryDto extends PaginationQueryDto {
   @IsOptional()
   @Transform(({ value }: { value: unknown }) =>
     typeof value === 'string' ? value.trim() : value,
@@ -11,10 +10,4 @@ export class ProductosQueryDto extends PaginationQueryDto {
   @IsString()
   @MaxLength(120)
   busqueda?: string;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  vendedorId?: number;
 }

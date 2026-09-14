@@ -37,6 +37,7 @@ export class ProductosController {
       query.vendedorId,
       query.page,
       query.pageSize,
+      query.busqueda,
     );
   }
 

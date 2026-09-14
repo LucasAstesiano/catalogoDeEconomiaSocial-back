@@ -28,7 +28,7 @@ import {
   type AuthenticatedUser,
 } from '../../auth/auth.types';
 import { Throttle } from '@nestjs/throttler';
-import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
+import { VendedoresQueryDto } from './dto/vendedores-query.dto';
 import { VerifyAdminMfaDto } from './dto/verify-admin-mfa.dto';
 
 @Controller('vendedores')
@@ -112,14 +112,24 @@ export class VendedoresController {
   /**listar vendedores */
   @Get()
   @Public()
-  findAll(@Query() query: PaginationQueryDto) {
-    return this.vendedoresService.findAll(query.page, query.pageSize);
+  findAll(@Query() query: VendedoresQueryDto) {
+    return this.vendedoresService.findAll(
+      query.page,
+      query.pageSize,
+      false,
+      query.busqueda,
+    );
   }
 
   @Get('admin/listado')
   @Roles('administrador')
-  findAllAdmin(@Query() query: PaginationQueryDto) {
-    return this.vendedoresService.findAll(query.page, query.pageSize, true);
+  findAllAdmin(@Query() query: VendedoresQueryDto) {
+    return this.vendedoresService.findAll(
+      query.page,
+      query.pageSize,
+      true,
+      query.busqueda,
+    );
   }
 
   @Get('me/perfil')
