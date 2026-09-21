@@ -5,11 +5,13 @@ import { Vendedor } from './entities/vendedore.entity';
 import { PasswordService } from '../../auth/password.service';
 import { JwtService } from '@nestjs/jwt';
 import { AdminMfaService } from '../../auth/admin-mfa.service';
+import { Not } from 'typeorm';
 
 describe('VendedoresService', () => {
   let service: VendedoresService;
   const vendedoresRepository = {
     find: jest.fn(),
+    findAndCount: jest.fn(),
     findOne: jest.fn(),
     save: jest.fn(),
     count: jest.fn(),
@@ -50,15 +52,44 @@ describe('VendedoresService', () => {
     expect(service).toBeDefined();
   });
 
-  it('publica solamente vendedores aprobados', async () => {
+  it('publica solamente vendedores aprobados que no sean administradores', async () => {
     vendedoresRepository.find.mockResolvedValue([]);
 
     await service.findAll(1, 50);
 
     expect(vendedoresRepository.find).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { estadoSolicitud: 'aprobado' },
+        where: { estadoSolicitud: 'aprobado', rol: Not('administrador') },
       }),
+    );
+  });
+
+  it('pagina la búsqueda pública de emprendedores en el servidor', async () => {
+    vendedoresRepository.findAndCount.mockResolvedValue([[], 0]);
+
+    await service.findCatalogo(2, 15, 'deva');
+
+    expect(vendedoresRepository.findAndCount).toHaveBeenCalledWith(
+      expect.objectContaining({
+        skip: 15,
+        take: 15,
+        where: expect.arrayContaining([
+          expect.objectContaining({
+            estadoSolicitud: 'aprobado',
+            rol: Not('administrador'),
+          }),
+        ]),
+      }),
+    );
+  });
+
+  it('filtra monotributistas solo en el listado administrativo', async () => {
+    vendedoresRepository.find.mockResolvedValue([]);
+
+    await service.findAll(1, 50, true, undefined, true);
+
+    expect(vendedoresRepository.find).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { esMonotributista: true } }),
     );
   });
 
@@ -69,6 +100,22 @@ describe('VendedoresService', () => {
     expect(vendedoresRepository.findOne).toHaveBeenCalledWith({
       where: { id: 7, estadoSolicitud: 'aprobado' },
     });
+  });
+
+  it('no expone la condición de monotributo en perfiles públicos', async () => {
+    vendedoresRepository.findOne.mockResolvedValue({
+      id: 7,
+      nombre: 'Emprendimiento',
+      email: 'emprendimiento@ejemplo.com',
+      estadoSolicitud: 'aprobado',
+      esMonotributista: true,
+      integrantesEquipo: [],
+      redesSociales: [],
+    });
+
+    const perfil = await service.findOne(7);
+
+    expect(perfil).not.toHaveProperty('esMonotributista');
   });
 
   it('revoca la sesion en el servidor al cerrar sesion', async () => {
@@ -183,6 +230,8 @@ describe('VendedoresService', () => {
     );
     expect(result).toEqual(
       expect.objectContaining({
+        // Jest declara objectContaining como any; el matcher no transporta datos de dominio.
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         user: expect.objectContaining({ passwordChangeRequired: true }),
       }),
     );

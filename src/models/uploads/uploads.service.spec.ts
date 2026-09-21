@@ -47,8 +47,11 @@ describe('UploadsService', () => {
   it.each([
     'productos/2026-08-25/123e4567-e89b-42d3-a456-426614174000.jpg',
     'vendedores/2026-08-25/123e4567-e89b-42d3-a456-426614174000.png',
+    'categorias/2026-08-25/123e4567-e89b-42d3-a456-426614174000.png',
     'productos/importados/15/inicial-a1b2c3d4e5f67890.webp',
     'productos/importados/15/final-a1b2c3d4e5f67890.jpeg',
+    'productos/api/23/inicial-a1b2c3d4e5f67890.jpg',
+    'productos/vendedor-api/23/inicial-a1b2c3d4e5f67890.jpg',
     'vendedores/importados/8/logo-a1b2c3d4e5f67890.gif',
   ])('acepta una clave de imagen generada por la aplicacion: %s', (key) => {
     const service = new UploadsService();

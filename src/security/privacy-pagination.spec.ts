@@ -24,9 +24,10 @@ describe('privacidad y paginacion', () => {
       vendedoresRepository as unknown as Repository<Vendedor>,
       {} as PasswordService,
       {} as JwtService,
+      {} as import('../auth/admin-mfa.service').AdminMfaService,
     );
 
-    const result = await service.findAll(2, 25);
+    const result = await service.findAll(2, 25, false);
 
     expect(vendedoresRepository.find).toHaveBeenCalledWith(
       expect.objectContaining({ skip: 25, take: 25 }),

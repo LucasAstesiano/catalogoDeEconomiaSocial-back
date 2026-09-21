@@ -3,10 +3,12 @@ import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   IsArray,
+  IsBoolean,
   IsEmail,
   IsIn,
   IsInt,
   IsOptional,
+  Matches,
   IsString,
   IsUrl,
   MaxLength,
@@ -14,6 +16,15 @@ import {
   MinLength,
   ValidateNested,
 } from 'class-validator';
+
+class RedSocialDto {
+  @IsIn(['facebook', 'instagram'])
+  tipo: 'facebook' | 'instagram';
+
+  @IsUrl({ require_protocol: true })
+  @MaxLength(2000)
+  url: string;
+}
 
 export class SolicitudPayloadDto {
   @IsOptional()
@@ -48,6 +59,10 @@ export class SolicitudPayloadDto {
   ruess?: string | null;
 
   @IsOptional()
+  @IsBoolean()
+  esMonotributista?: boolean | null;
+
+  @IsOptional()
   @IsString()
   @MaxLength(5000)
   descripcionNegocio?: string | null;
@@ -66,6 +81,7 @@ export class SolicitudPayloadDto {
 
   @IsOptional()
   @IsString()
+  @Matches(/^\+549\d{10}$/)
   @MaxLength(50)
   whatsapp?: string | null;
 
@@ -73,6 +89,13 @@ export class SolicitudPayloadDto {
   @IsString()
   @MaxLength(50)
   telefono?: string | null;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(3)
+  @ValidateNested({ each: true })
+  @Type(() => RedSocialDto)
+  redesSociales?: RedSocialDto[];
 
   @IsOptional()
   @IsUrl({ require_protocol: true })
@@ -96,7 +119,12 @@ export class SolicitudPayloadDto {
 }
 
 export class CreateSolicitudDto {
-  @IsIn(['actualizacion_datos', 'nuevo_producto', 'actualizacion_producto'])
+  @IsIn([
+    'actualizacion_datos',
+    'nuevo_producto',
+    'actualizacion_producto',
+    'eliminacion_producto',
+  ])
   tipo: Exclude<SolicitudTipo, 'registro_usuario'>;
   @IsOptional()
   @IsInt()

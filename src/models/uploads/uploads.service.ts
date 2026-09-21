@@ -16,15 +16,15 @@ import { extname } from 'path';
 import { Readable, Transform } from 'node:stream';
 import { resolveEnvironment } from '../../config/environment';
 
-export type ImageFolder = 'productos' | 'vendedores';
+export type ImageFolder = 'productos' | 'vendedores' | 'categorias';
 
 @Injectable()
 export class UploadsService {
   private static readonly MAX_IMAGE_BYTES = 5 * 1024 * 1024;
   private static readonly MANUAL_IMAGE_KEY =
-    /^(productos|vendedores)\/\d{4}-\d{2}-\d{2}\/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(jpg|jpeg|png|webp|gif)$/i;
+    /^(productos|vendedores|categorias)\/\d{4}-\d{2}-\d{2}\/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(jpg|jpeg|png|webp|gif)$/i;
   private static readonly IMPORTED_PRODUCT_IMAGE_KEY =
-    /^productos\/importados\/\d+\/(inicial|final)-[0-9a-f]{16}\.(jpg|jpeg|png|webp|gif)$/i;
+    /^productos\/(importados|api|vendedor-api)\/\d+\/(inicial|final)-[0-9a-f]{16}\.(jpg|jpeg|png|webp|gif)$/i;
   private static readonly IMPORTED_VENDOR_IMAGE_KEY =
     /^vendedores\/importados\/\d+\/logo-[0-9a-f]{16}\.(jpg|jpeg|png|webp|gif)$/i;
   private static readonly CONTENT_TYPES: Record<string, string> = {
@@ -214,6 +214,10 @@ export class UploadsService {
   }
 
   private publicUrl(key: string) {
+    const apiBase = this.environment.PUBLIC_API_URL?.replace(/\/$/, '');
+    if (apiBase) {
+      return `${apiBase}/api/v1/uploads/image?key=${encodeURIComponent(key)}`;
+    }
     const publicBase = this.environment.S3_PUBLIC_URL?.replace(/\/$/, '');
     if (publicBase) {
       return `${publicBase}/${key}`;

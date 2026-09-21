@@ -26,6 +26,9 @@ export class Vendedor {
   @Column({ type: 'varchar', length: 30, nullable: true })
   ruess: string | null;
 
+  @Column({ name: 'es_monotributista', type: 'boolean', nullable: true })
+  esMonotributista: boolean | null;
+
   @Column({ name: 'descripcion_negocio', type: 'text', nullable: true })
   descripcionNegocio: string | null;
 
@@ -48,6 +51,12 @@ export class Vendedor {
 
   @Column({ name: 'logo_url', type: 'text', nullable: true })
   logoUrl: string | null;
+
+  @Column({ name: 'redes_sociales', type: 'jsonb', default: () => "'[]'" })
+  redesSociales: Array<{
+    tipo: 'facebook' | 'instagram';
+    url: string;
+  }>;
 
   @Column({ name: 'password_hash', length: 128 })
   passwordHash: string;

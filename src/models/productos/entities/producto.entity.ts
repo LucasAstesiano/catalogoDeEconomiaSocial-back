@@ -6,6 +6,8 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { Vendedor } from '../../vendedores/entities/vendedore.entity';
+import { Categoria } from '../../categorias/entities/categoria.entity';
+import { Subcategoria } from '../../categorias/entities/subcategoria.entity';
 
 @Entity({ name: 'productos' })
 export class Producto {
@@ -21,8 +23,25 @@ export class Producto {
   @Column({ type: 'varchar', length: 80 })
   categoria: string;
 
+  @Column({ name: 'categoria_id' })
+  categoriaId: number;
+
+  @ManyToOne(() => Categoria, (categoria) => categoria.productos, {
+    nullable: false,
+    onDelete: 'RESTRICT',
+  })
+  @JoinColumn({ name: 'categoria_id' })
+  categoriaDefinida: Categoria;
+
   @Column({ type: 'varchar', length: 120, nullable: true })
   subcategoria: string | null;
+
+  @Column({ name: 'subcategoria_id', nullable: true })
+  subcategoriaId: number | null;
+
+  @ManyToOne(() => Subcategoria, { nullable: true, onDelete: 'RESTRICT' })
+  @JoinColumn({ name: 'subcategoria_id' })
+  subcategoriaDefinida: Subcategoria | null;
 
   @Column({ name: 'imagen_url', type: 'text', nullable: true })
   imagenUrl: string | null;

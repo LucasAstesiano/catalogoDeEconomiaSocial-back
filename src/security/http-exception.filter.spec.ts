@@ -9,12 +9,16 @@ describe('postgresConflictMessage', () => {
       'El registro esta relacionado con otros datos y no puede eliminarse',
     ],
   ])('mapea el codigo PostgreSQL %s', (code, expected) => {
-    const error = new QueryFailedError('consulta', [], { code });
+    const error = new QueryFailedError('consulta', [], {
+      code,
+    } as unknown as Error);
     expect(postgresConflictMessage(error)).toBe(expected);
   });
 
   it('no transforma otros errores de base de datos', () => {
-    const error = new QueryFailedError('consulta', [], { code: '22001' });
+    const error = new QueryFailedError('consulta', [], {
+      code: '22001',
+    } as unknown as Error);
     expect(postgresConflictMessage(error)).toBeNull();
   });
 });

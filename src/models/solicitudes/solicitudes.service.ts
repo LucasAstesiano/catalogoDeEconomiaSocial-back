@@ -10,12 +10,15 @@ import { PasswordService } from '../../auth/password.service';
 import { AuthenticatedUser } from '../../auth/auth.types';
 import { ForbiddenException } from '@nestjs/common';
 import { Producto } from '../productos/entities/producto.entity';
+import { Categoria } from '../categorias/entities/categoria.entity';
+import { Subcategoria } from '../categorias/entities/subcategoria.entity';
 import { Vendedor } from '../vendedores/entities/vendedore.entity';
 import { CreateSolicitudDto } from './dto/create-solicitud.dto';
 import { CreateRegistrationDto } from './dto/create-registration.dto';
 import { Solicitud, SolicitudEstado } from './entities/solicitud.entity';
 import type {
   NewProductPayload,
+  ProductDeletionPayload,
   ProductUpdatePayload,
   RegistrationPayload,
   SolicitudPayload,
@@ -34,6 +37,33 @@ type SafeSolicitudResponse = Omit<Solicitud, 'payload'> & {
 
 @Injectable()
 export class SolicitudesService {
+  private normalizarRedes(valor: unknown) {
+    if (!Array.isArray(valor)) return [];
+    return valor.flatMap((item) => {
+      if (!item || typeof item !== 'object') return [];
+      const { tipo, url } = item as { tipo?: unknown; url?: unknown };
+      if (
+        !['facebook', 'instagram'].includes(String(tipo)) ||
+        typeof url !== 'string' ||
+        !/^https?:\/\//i.test(url.trim())
+      ) {
+        return [];
+      }
+      return [
+        {
+          tipo: tipo as 'facebook' | 'instagram',
+          url: url.trim(),
+        },
+      ];
+    });
+  }
+
+  private normalizarWhatsapp(valor: unknown) {
+    if (typeof valor !== 'string') return null;
+    const digitos = valor.replace(/\D/g, '');
+    return /^549\d{10}$/.test(digitos) ? digitos : null;
+  }
+
   constructor(
     @InjectRepository(Solicitud)
     private readonly solicitudesRepository: Repository<Solicitud>,
@@ -235,11 +265,13 @@ export class SolicitudesService {
             rol: 'usuario',
             estadoSolicitud: 'aprobado',
             ruess: payload.ruess ?? null,
+            esMonotributista: payload.esMonotributista ?? null,
             descripcionNegocio: payload.descripcionNegocio ?? null,
             integrantesEquipo: payload.integrantesEquipo ?? [],
             ubicacion: payload.ubicacion ?? null,
-            whatsapp: payload.whatsapp ?? null,
+            whatsapp: this.normalizarWhatsapp(payload.whatsapp),
             telefono: payload.telefono ?? null,
+            redesSociales: this.normalizarRedes(payload.redesSociales),
             passwordHash: payload.passwordHash,
           }),
         );
@@ -261,6 +293,9 @@ export class SolicitudesService {
         if (payload.ruess !== undefined) {
           vendedor.ruess = payload.ruess ? String(payload.ruess) : null;
         }
+        if (payload.esMonotributista !== undefined) {
+          vendedor.esMonotributista = payload.esMonotributista;
+        }
         if (payload.descripcionNegocio !== undefined) {
           vendedor.descripcionNegocio = payload.descripcionNegocio
             ? String(payload.descripcionNegocio)
@@ -277,14 +312,15 @@ export class SolicitudesService {
             : null;
         }
         if (payload.whatsapp !== undefined) {
-          vendedor.whatsapp = payload.whatsapp
-            ? String(payload.whatsapp)
-            : null;
+          vendedor.whatsapp = this.normalizarWhatsapp(payload.whatsapp);
         }
         if (payload.telefono !== undefined) {
           vendedor.telefono = payload.telefono
             ? String(payload.telefono)
             : null;
+        }
+        if (payload.redesSociales !== undefined) {
+          vendedor.redesSociales = this.normalizarRedes(payload.redesSociales);
         }
 
         await vendedores.save(vendedor);
@@ -301,14 +337,36 @@ export class SolicitudesService {
           throw new NotFoundException('Vendedor no encontrado');
         }
 
+        const categoria = await manager.getRepository(Categoria).findOne({
+          where: {
+            nombre: String(payload.categoria ?? '').trim(),
+            activa: true,
+          },
+        });
+        if (!categoria)
+          throw new BadRequestException(
+            'La categoría seleccionada no existe o no está activa.',
+          );
+        const subcategoria = payload.subcategoria
+          ? await manager.getRepository(Subcategoria).findOne({
+              where: {
+                nombre: String(payload.subcategoria).trim(),
+                categoriaId: categoria.id,
+              },
+            })
+          : null;
+        if (payload.subcategoria && !subcategoria)
+          throw new BadRequestException(
+            'La subcategoría no pertenece a la categoría indicada.',
+          );
         await productos.save(
           productos.create({
             nombre: String(payload.nombre ?? ''),
             descripcion: String(payload.descripcion ?? ''),
-            categoria: String(payload.categoria ?? ''),
-            subcategoria: payload.subcategoria
-              ? String(payload.subcategoria)
-              : null,
+            categoria: categoria.nombre,
+            categoriaId: categoria.id,
+            subcategoria: subcategoria?.nombre ?? null,
+            subcategoriaId: subcategoria?.id ?? null,
             imagenUrl: payload.imagenUrl ? String(payload.imagenUrl) : null,
             imagenUrl2: payload.imagenUrl2 ? String(payload.imagenUrl2) : null,
             imagenUrl3: payload.imagenUrl3 ? String(payload.imagenUrl3) : null,
@@ -334,12 +392,35 @@ export class SolicitudesService {
           producto.descripcion = String(payload.descripcion);
         }
         if (payload.categoria !== undefined) {
-          producto.categoria = String(payload.categoria);
+          const categoria = await manager.getRepository(Categoria).findOne({
+            where: { nombre: String(payload.categoria).trim(), activa: true },
+          });
+          if (!categoria) {
+            throw new BadRequestException(
+              'La categoría seleccionada no existe o no está activa.',
+            );
+          }
+          producto.categoria = categoria.nombre;
+          producto.categoriaId = categoria.id;
         }
         if (payload.subcategoria !== undefined) {
-          producto.subcategoria = payload.subcategoria
-            ? String(payload.subcategoria)
+          const subcategoria = payload.subcategoria
+            ? await manager.getRepository(Subcategoria).findOne({
+                where: {
+                  nombre: String(payload.subcategoria).trim(),
+                  categoriaId: producto.categoriaId,
+                },
+              })
             : null;
+          if (payload.subcategoria && !subcategoria)
+            throw new BadRequestException(
+              'La subcategoría no pertenece a la categoría indicada.',
+            );
+          producto.subcategoria = subcategoria?.nombre ?? null;
+          producto.subcategoriaId = subcategoria?.id ?? null;
+        } else if (payload.categoria !== undefined) {
+          producto.subcategoria = null;
+          producto.subcategoriaId = null;
         }
         if (payload.imagenUrl !== undefined) {
           producto.imagenUrl = payload.imagenUrl
@@ -365,6 +446,17 @@ export class SolicitudesService {
         await productos.save(producto);
         break;
       }
+      case 'eliminacion_producto': {
+        const payload = solicitud.payload as ProductDeletionPayload;
+        const producto = await productos.findOne({
+          where: { id: Number(payload.productoId) },
+        });
+        if (!producto) {
+          throw new NotFoundException('Producto no encontrado');
+        }
+        await productos.remove(producto);
+        break;
+      }
       default:
         throw new BadRequestException('Tipo de solicitud no soportado');
     }
@@ -379,18 +471,35 @@ export class SolicitudesService {
     if (dto.tipo === 'actualizacion_datos' || dto.tipo === 'nuevo_producto') {
       return;
     }
-    if (dto.tipo === 'actualizacion_producto') {
+    if (
+      dto.tipo === 'actualizacion_producto' ||
+      dto.tipo === 'eliminacion_producto'
+    ) {
       const producto = await this.productosRepository.findOne({
         where: { id: Number(payload.productoId) },
       });
       if (!producto || producto.vendedorId !== requester.sub) {
-        throw new ForbiddenException('No podes modificar un producto ajeno');
+        throw new ForbiddenException('No podes gestionar un producto ajeno');
       }
     }
   }
 
   private validateAuthenticatedPayload(dto: CreateSolicitudDto) {
     const payload = dto.payload;
+    if (
+      dto.tipo === 'actualizacion_datos' &&
+      payload.redesSociales !== undefined
+    ) {
+      if (!Array.isArray(payload.redesSociales)) {
+        throw new BadRequestException('Las redes sociales deben ser una lista');
+      }
+      const redes = this.normalizarRedes(payload.redesSociales);
+      if (redes.length !== payload.redesSociales.length) {
+        throw new BadRequestException(
+          'Cada red debe ser Facebook o Instagram e incluir un enlace HTTP(S) válido',
+        );
+      }
+    }
     if (dto.tipo === 'nuevo_producto') {
       if (!payload.nombre || !payload.descripcion || !payload.categoria) {
         throw new BadRequestException(
@@ -399,7 +508,11 @@ export class SolicitudesService {
       }
     }
 
-    if (dto.tipo === 'actualizacion_producto' && !payload.productoId) {
+    if (
+      (dto.tipo === 'actualizacion_producto' ||
+        dto.tipo === 'eliminacion_producto') &&
+      !payload.productoId
+    ) {
       throw new BadRequestException('El productoId es obligatorio');
     }
   }

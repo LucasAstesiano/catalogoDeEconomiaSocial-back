@@ -2,9 +2,11 @@ import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   IsArray,
+  IsBoolean,
   IsEmail,
   IsIn,
   IsOptional,
+  Matches,
   IsString,
   MaxLength,
   MinLength,
@@ -32,6 +34,10 @@ export class RegistrationPayloadDto {
   ruess?: string | null;
 
   @IsOptional()
+  @IsBoolean()
+  esMonotributista?: boolean | null;
+
+  @IsOptional()
   @IsString()
   @MaxLength(5000)
   descripcionNegocio?: string | null;
@@ -50,6 +56,7 @@ export class RegistrationPayloadDto {
 
   @IsOptional()
   @IsString()
+  @Matches(/^\+549\d{10}$/)
   @MaxLength(50)
   whatsapp?: string | null;
 

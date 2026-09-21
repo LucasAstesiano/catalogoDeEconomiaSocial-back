@@ -3,6 +3,7 @@ import { ProductosService } from './productos.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Producto } from './entities/producto.entity';
 import { Vendedor } from '../vendedores/entities/vendedore.entity';
+import { Categoria } from '../categorias/entities/categoria.entity';
 
 describe('ProductosService', () => {
   let service: ProductosService;
@@ -11,6 +12,7 @@ describe('ProductosService', () => {
     find: jest.Mock;
   };
   let vendedoresRepository: { find: jest.Mock };
+  let categoriasRepository: { findOne: jest.Mock };
 
   beforeEach(async () => {
     productosRepository = {
@@ -18,6 +20,7 @@ describe('ProductosService', () => {
       find: jest.fn(),
     };
     vendedoresRepository = { find: jest.fn() };
+    categoriasRepository = { findOne: jest.fn() };
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ProductosService,
@@ -28,6 +31,10 @@ describe('ProductosService', () => {
         {
           provide: getRepositoryToken(Vendedor),
           useValue: vendedoresRepository,
+        },
+        {
+          provide: getRepositoryToken(Categoria),
+          useValue: categoriasRepository,
         },
       ],
     }).compile();

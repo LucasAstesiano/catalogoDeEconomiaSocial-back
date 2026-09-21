@@ -14,6 +14,7 @@ import { AuthGuard } from './auth/auth.guard';
 import { RolesGuard } from './auth/roles.guard';
 import { AuditInterceptor } from './security/audit.interceptor';
 import { validateEnvironment } from './config/environment';
+import { CategoriasModule } from './models/categorias/categorias.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { validateEnvironment } from './config/environment';
     ProductosModule,
     SolicitudesModule,
     UploadsModule,
+    CategoriasModule,
   ],
   controllers: [AppController],
   providers: [

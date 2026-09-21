@@ -121,6 +121,16 @@ export class VendedoresController {
     );
   }
 
+  @Get('catalogo')
+  @Public()
+  findCatalogo(@Query() query: VendedoresQueryDto) {
+    return this.vendedoresService.findCatalogo(
+      query.page,
+      query.pageSize,
+      query.busqueda,
+    );
+  }
+
   @Get('admin/listado')
   @Roles('administrador')
   findAllAdmin(@Query() query: VendedoresQueryDto) {
@@ -129,6 +139,7 @@ export class VendedoresController {
       query.pageSize,
       true,
       query.busqueda,
+      query.esMonotributista,
     );
   }
 

@@ -11,7 +11,8 @@ export type SolicitudTipo =
   | 'registro_usuario'
   | 'actualizacion_datos'
   | 'nuevo_producto'
-  | 'actualizacion_producto';
+  | 'actualizacion_producto'
+  | 'eliminacion_producto';
 
 export type SolicitudEstado = 'pendiente' | 'aprobada' | 'rechazada';
 

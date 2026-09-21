@@ -3,22 +3,32 @@ export type RegistrationPayload = {
   email: string;
   passwordHash: string;
   ruess?: string | null;
+  esMonotributista?: boolean | null;
   descripcionNegocio?: string | null;
   integrantesEquipo?: string[];
   ubicacion?: string | null;
   whatsapp?: string | null;
   telefono?: string | null;
+  redesSociales?: Array<{
+    tipo: 'facebook' | 'instagram';
+    url: string;
+  }>;
 };
 
 export type VendorUpdatePayload = {
   vendedorId: number;
   nombre?: string;
   ruess?: string | null;
+  esMonotributista?: boolean | null;
   descripcionNegocio?: string | null;
   integrantesEquipo?: string[];
   ubicacion?: string | null;
   whatsapp?: string | null;
   telefono?: string | null;
+  redesSociales?: Array<{
+    tipo: 'facebook' | 'instagram';
+    url: string;
+  }>;
 };
 
 export type NewProductPayload = {
@@ -38,8 +48,14 @@ export type ProductUpdatePayload = Omit<
   'vendedorId'
 > & { productoId: number };
 
+export type ProductDeletionPayload = {
+  productoId: number;
+  nombre?: string;
+};
+
 export type SolicitudPayload =
   | RegistrationPayload
   | VendorUpdatePayload
   | NewProductPayload
-  | ProductUpdatePayload;
+  | ProductUpdatePayload
+  | ProductDeletionPayload;

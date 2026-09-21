@@ -38,7 +38,7 @@ describe('SolicitudesService.reject', () => {
       estado: 'pendiente',
       solicitanteEmail: 'Persona@Ejemplo.com',
       payload: { email: 'Persona@Ejemplo.com', passwordHash: 'hash' },
-    } as Solicitud;
+    } as unknown as Solicitud;
     solicitudes.findOne.mockResolvedValue(solicitud);
     solicitudes.save.mockImplementation((value: Solicitud) =>
       Promise.resolve(value),
@@ -60,7 +60,7 @@ describe('SolicitudesService.reject', () => {
       tipo: 'registro_usuario',
       estado: 'aprobada',
       payload: { email: 'aprobado@ejemplo.com', passwordHash: 'hash' },
-    } as Solicitud;
+    } as unknown as Solicitud;
     solicitudes.findOne.mockResolvedValue(solicitud);
 
     const result = await service.reject(8, 1);
@@ -77,6 +77,53 @@ describe('SolicitudesService.reject', () => {
     await expect(service.reject(999, 1)).rejects.toBeInstanceOf(
       NotFoundException,
     );
+  });
+});
+
+describe('SolicitudesService.approve', () => {
+  it('elimina el producto solamente al aprobar su solicitud de eliminación', async () => {
+    const solicitudes = {
+      findOne: jest.fn(),
+      save: jest.fn((value: Solicitud) => Promise.resolve(value)),
+    };
+    const productos = {
+      findOne: jest.fn(),
+      remove: jest.fn((value: Producto) => Promise.resolve(value)),
+    };
+    const manager = {
+      getRepository: jest.fn((entity: unknown) =>
+        entity === Solicitud ? solicitudes : productos,
+      ),
+    } as unknown as EntityManager;
+    const service = new SolicitudesService(
+      {} as Repository<Solicitud>,
+      {} as Repository<Vendedor>,
+      {} as Repository<Producto>,
+      {} as PasswordService,
+      {
+        transaction: jest.fn(
+          async (callback: (entityManager: EntityManager) => Promise<unknown>) =>
+            callback(manager),
+        ),
+      } as unknown as DataSource,
+    );
+    const solicitud = {
+      id: 15,
+      tipo: 'eliminacion_producto',
+      estado: 'pendiente',
+      payload: { productoId: 32, nombre: 'Canasto' },
+    } as unknown as Solicitud;
+    const producto = { id: 32, nombre: 'Canasto' } as Producto;
+    solicitudes.findOne.mockResolvedValue(solicitud);
+    productos.findOne.mockResolvedValue(producto);
+
+    const result = await service.approve(15, 1);
+
+    expect(productos.remove).toHaveBeenCalledWith(producto);
+    expect(solicitudes.save).toHaveBeenCalledWith(
+      expect.objectContaining({ estado: 'aprobada', resueltoPor: 1 }),
+    );
+    expect(result.estado).toBe('aprobada');
   });
 });
 
@@ -148,7 +195,7 @@ describe('SolicitudesService respuestas seguras', () => {
         password: 'legacy-secret',
         passwordHash: 'argon2-secret-hash',
       },
-    } as Solicitud;
+    } as unknown as Solicitud;
     solicitudesRepository.find.mockResolvedValue([stored]);
 
     const result = await service.findAll();

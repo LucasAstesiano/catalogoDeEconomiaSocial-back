@@ -40,7 +40,11 @@ export class UploadsController {
     )
     file: Express.Multer.File,
   ) {
-    if (folder !== 'productos' && folder !== 'vendedores') {
+    if (
+      folder !== 'productos' &&
+      folder !== 'vendedores' &&
+      folder !== 'categorias'
+    ) {
       throw new BadRequestException('La carpeta de destino no es valida.');
     }
     return this.uploadsService.uploadImage(file, folder);

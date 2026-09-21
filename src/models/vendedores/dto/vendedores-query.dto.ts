@@ -1,5 +1,5 @@
 import { Transform } from 'class-transformer';
-import { IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsBoolean, IsOptional, IsString, MaxLength } from 'class-validator';
 import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
 
 export class VendedoresQueryDto extends PaginationQueryDto {
@@ -10,4 +10,13 @@ export class VendedoresQueryDto extends PaginationQueryDto {
   @IsString()
   @MaxLength(120)
   busqueda?: string;
+
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) => {
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    return value;
+  })
+  @IsBoolean()
+  esMonotributista?: boolean;
 }

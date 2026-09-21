@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { JwtService } from '@nestjs/jwt';
-import { ILike, Repository } from 'typeorm';
+import { ILike, Not, Repository } from 'typeorm';
 import { PasswordService } from '../../auth/password.service';
 import { CreateVendedoreDto } from './dto/create-vendedore.dto';
 import { UpdateVendedoreDto } from './dto/update-vendedore.dto';
@@ -19,6 +19,32 @@ import { AdminMfaService } from '../../auth/admin-mfa.service';
 export class VendedoresService {
   private static readonly DUMMY_PASSWORD_HASH =
     '$argon2id$v=19$m=65536,p=1,t=3$I6AuZQ2Sm3+HCUZW+UQe6w$u5EhQsZPLV0McSJpWtsCJbao46OHQonWb0v+Z/x4yZ8';
+
+  private normalizarRedes(valor: unknown) {
+    if (!Array.isArray(valor)) return [];
+    return valor.flatMap((item) => {
+      if (!item || typeof item !== 'object') return [];
+      const { tipo, url } = item as { tipo?: unknown; url?: unknown };
+      if (
+        !['facebook', 'instagram'].includes(String(tipo)) ||
+        typeof url !== 'string' ||
+        !/^https?:\/\//i.test(url.trim())
+      )
+        return [];
+      return [
+        {
+          tipo: tipo as 'facebook' | 'instagram',
+          url: url.trim(),
+        },
+      ];
+    });
+  }
+
+  private normalizarWhatsapp(valor: string | null | undefined) {
+    if (!valor) return null;
+    const digitos = valor.replace(/\D/g, '');
+    return /^549\d{10}$/.test(digitos) ? digitos : null;
+  }
 
   constructor(
     @InjectRepository(Vendedor)
@@ -36,12 +62,14 @@ export class VendedoresService {
       nombre: vendedor.nombre,
       email: vendedor.email,
       ruess: vendedor.ruess,
+      esMonotributista: vendedor.esMonotributista,
       descripcionNegocio: vendedor.descripcionNegocio,
       integrantesEquipo: vendedor.integrantesEquipo ?? [],
       ubicacion: vendedor.ubicacion,
       whatsapp: vendedor.whatsapp,
       telefono: vendedor.telefono,
       logoUrl: vendedor.logoUrl,
+      redesSociales: this.normalizarRedes(vendedor.redesSociales),
     };
   }
 
@@ -57,6 +85,7 @@ export class VendedoresService {
       whatsapp: vendedor.whatsapp,
       telefono: vendedor.telefono,
       logoUrl: vendedor.logoUrl,
+      redesSociales: this.normalizarRedes(vendedor.redesSociales),
     };
   }
 
@@ -75,12 +104,14 @@ export class VendedoresService {
       rol: 'usuario',
       estadoSolicitud: 'pendiente',
       ruess: createVendedoreDto.ruess ?? null,
+      esMonotributista: createVendedoreDto.esMonotributista ?? null,
       descripcionNegocio: createVendedoreDto.descripcionNegocio ?? null,
       integrantesEquipo: createVendedoreDto.integrantesEquipo ?? [],
       ubicacion: createVendedoreDto.ubicacion ?? null,
-      whatsapp: createVendedoreDto.whatsapp ?? null,
+      whatsapp: this.normalizarWhatsapp(createVendedoreDto.whatsapp),
       telefono: createVendedoreDto.telefono ?? null,
       logoUrl: createVendedoreDto.logoUrl ?? null,
+      redesSociales: this.normalizarRedes(createVendedoreDto.redesSociales),
       passwordHash: await this.passwordService.hash(
         createVendedoreDto.password,
       ),
@@ -181,19 +212,45 @@ export class VendedoresService {
     pageSize = 50,
     includePrivate = false,
     busqueda?: string,
+    esMonotributista?: boolean,
   ) {
     const termino = busqueda?.trim();
     const patron = termino ? `%${termino}%` : undefined;
+    const filtroMonotributo =
+      includePrivate && esMonotributista !== undefined
+        ? { esMonotributista }
+        : {};
     const where = patron
       ? includePrivate
-        ? [{ nombre: ILike(patron) }, { email: ILike(patron) }]
+        ? [
+            { ...filtroMonotributo, nombre: ILike(patron) },
+            { ...filtroMonotributo, email: ILike(patron) },
+            { ...filtroMonotributo, ruess: ILike(patron) },
+            { ...filtroMonotributo, descripcionNegocio: ILike(patron) },
+            { ...filtroMonotributo, ubicacion: ILike(patron) },
+            { ...filtroMonotributo, whatsapp: ILike(patron) },
+            { ...filtroMonotributo, telefono: ILike(patron) },
+          ]
         : [
-            { estadoSolicitud: 'aprobado' as const, nombre: ILike(patron) },
-            { estadoSolicitud: 'aprobado' as const, email: ILike(patron) },
+            {
+              estadoSolicitud: 'aprobado' as const,
+              rol: Not<Vendedor['rol']>('administrador'),
+              nombre: ILike(patron),
+            },
+            {
+              estadoSolicitud: 'aprobado' as const,
+              rol: Not<Vendedor['rol']>('administrador'),
+              email: ILike(patron),
+            },
           ]
       : includePrivate
-        ? undefined
-        : { estadoSolicitud: 'aprobado' as const };
+        ? esMonotributista === undefined
+          ? undefined
+          : filtroMonotributo
+        : {
+            estadoSolicitud: 'aprobado' as const,
+            rol: Not<Vendedor['rol']>('administrador'),
+          };
     const vendedores = await this.vendedoresRepository.find({
       where,
       order: { id: 'ASC' },
@@ -203,6 +260,47 @@ export class VendedoresService {
     return vendedores.map((vendedor) =>
       includePrivate ? this.sanitize(vendedor) : this.sanitizePublic(vendedor),
     );
+  }
+
+  async findCatalogo(page = 1, pageSize = 50, busqueda?: string) {
+    const termino = busqueda?.trim();
+    const patron = termino ? `%${termino}%` : undefined;
+    const where = patron
+      ? [
+          {
+            estadoSolicitud: 'aprobado' as const,
+            rol: Not<Vendedor['rol']>('administrador'),
+            nombre: ILike(patron),
+          },
+          {
+            estadoSolicitud: 'aprobado' as const,
+            rol: Not<Vendedor['rol']>('administrador'),
+            email: ILike(patron),
+          },
+          {
+            estadoSolicitud: 'aprobado' as const,
+            rol: Not<Vendedor['rol']>('administrador'),
+            descripcionNegocio: ILike(patron),
+          },
+        ]
+      : {
+          estadoSolicitud: 'aprobado' as const,
+          rol: Not<Vendedor['rol']>('administrador'),
+        };
+    const [vendedores, total] = await this.vendedoresRepository.findAndCount({
+      where,
+      order: { id: 'ASC' },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    });
+
+    return {
+      items: vendedores.map((vendedor) => this.sanitizePublic(vendedor)),
+      total,
+      page,
+      pageSize,
+      totalPages: Math.max(1, Math.ceil(total / pageSize)),
+    };
   }
 
   async findOne(id: number, includePrivate = false) {
@@ -252,6 +350,9 @@ export class VendedoresService {
     if (updateVendedoreDto.ruess !== undefined) {
       vendedor.ruess = updateVendedoreDto.ruess || null;
     }
+    if (updateVendedoreDto.esMonotributista !== undefined) {
+      vendedor.esMonotributista = updateVendedoreDto.esMonotributista;
+    }
     if (updateVendedoreDto.descripcionNegocio !== undefined) {
       vendedor.descripcionNegocio =
         updateVendedoreDto.descripcionNegocio || null;
@@ -263,7 +364,7 @@ export class VendedoresService {
       vendedor.ubicacion = updateVendedoreDto.ubicacion || null;
     }
     if (updateVendedoreDto.whatsapp !== undefined) {
-      vendedor.whatsapp = updateVendedoreDto.whatsapp || null;
+      vendedor.whatsapp = this.normalizarWhatsapp(updateVendedoreDto.whatsapp);
     }
     if (updateVendedoreDto.telefono !== undefined) {
       vendedor.telefono = updateVendedoreDto.telefono || null;
@@ -271,6 +372,10 @@ export class VendedoresService {
     if (updateVendedoreDto.logoUrl !== undefined) {
       vendedor.logoUrl = updateVendedoreDto.logoUrl || null;
     }
+    if (updateVendedoreDto.redesSociales !== undefined)
+      vendedor.redesSociales = this.normalizarRedes(
+        updateVendedoreDto.redesSociales,
+      );
 
     const saved = await this.vendedoresRepository.save(vendedor);
     return this.sanitize(saved);
